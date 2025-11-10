@@ -32,12 +32,14 @@ def get_records_wellness_db(as_df: bool = True):
         query = """
             SELECT 
                 w.id,
-                w.identificacion,
+                w.id_jugadora,
+                f.nombre,
+                f.apellido,
                 w.fecha_sesion,
                 w.tipo,
                 w.turno,
                 w.recuperacion,
-                w.fatiga,
+                w.fatiga as energia,
                 w.sueno,
                 w.stress,
                 w.dolor,
@@ -53,6 +55,7 @@ def get_records_wellness_db(as_df: bool = True):
                 w.fecha_hora_registro,
                 w.usuario
             FROM wellness AS w
+            LEFT JOIN futbolistas f ON w.id_jugadora = f.id
             LEFT JOIN estimulos_campo AS ec 
                 ON w.id_tipo_estimulo = ec.id
             LEFT JOIN estimulos_readaptacion AS er 
@@ -78,8 +81,11 @@ def get_records_wellness_db(as_df: bool = True):
             )
 
         # --- Procesar fechas ---
-        #if "fecha_sesion" in df.columns:
-        #    df["fecha_sesion"] = pd.to_datetime(df["fecha_sesion"], errors="coerce")
+        if "fecha_sesion" in df.columns:
+            df["fecha_sesion"] = (
+                pd.to_datetime(df["fecha_sesion"], errors="coerce")
+                .apply(lambda x: x.date() if pd.notnull(x) else None)
+            )
 
         if "fecha_hora_registro" in df.columns:
             df["fecha_hora_registro"] = pd.to_datetime(df["fecha_hora_registro"], errors="coerce")
@@ -87,22 +93,31 @@ def get_records_wellness_db(as_df: bool = True):
         # --- Ordenar de forma más reciente a más antigua ---
         df = df.sort_values(by="fecha_hora_registro", ascending=False)
 
+        if st.session_state["auth"]["rol"].lower() == "developer":
+            df = df[df["usuario"]=="developer"]
+        else:
+            df = df[df["usuario"]!="developer"]
+
+        # print(df["fecha_sesion"].head())
+        # print(df["fecha_sesion"].dtype)
+        # print(type(df["fecha_sesion"].iloc[0]))
+
         # --- Retornar según formato deseado ---
         return df if as_df else df.to_dict(orient="records")
 
     except Exception as e:
-        st.error(f":material/warning: Error al cargar registros de wellness: {e}")
+        st.error(f":material/warning: Error al cargar los registros de wellness: {e}")
         return pd.DataFrame() if as_df else []
     finally:
         conn.close()
 
-def get_record_for_player_day_turno_db(identificacion: str, fecha_sesion: str, turno: str):
+def get_record_for_player_day_turno_db(id_jugadora: str, fecha_sesion: str, turno: str):
     """
     Devuelve el primer registro existente en la BD 'wellness'
     para una jugadora, una fecha de sesión y un turno dados.
 
     Parámetros:
-        identificacion (str): ID o documento de la jugadora.
+        id_jugadora (str): ID o documento de la jugadora.
         fecha_sesion (str): Fecha en formato 'YYYY-MM-DD'.
         turno (str): Turno del entrenamiento.
 
@@ -127,17 +142,41 @@ def get_record_for_player_day_turno_db(identificacion: str, fecha_sesion: str, t
                 st.error(f":material/warning: Formato de fecha inválido: {fecha_sesion}")
                 return None
 
-        # --- Buscar el registro en la BD ---
-        query = """
-            SELECT *
-            FROM wellness
-            WHERE identificacion = %s
-              AND fecha_sesion = %s
-              AND turno = %s
-            LIMIT 1;
-        """
-        cursor.execute(query, (identificacion, fecha_sesion, turno))
+        # --- Logging modo developer ---
+        rol_actual = st.session_state["auth"]["rol"].lower().strip()
+
+        if rol_actual == "developer":
+            # --- Buscar el registro en la BD ---
+            query = """
+                SELECT *
+                FROM wellness
+                WHERE id_jugadora = %s
+                AND fecha_sesion = %s
+                AND turno = %s
+                AND usuario = %s
+                LIMIT 1;
+            """
+            usuario = rol_actual
+        else:
+            query = """
+                SELECT *
+                FROM wellness
+                WHERE id_jugadora = %s
+                AND fecha_sesion = %s
+                AND turno = %s
+                AND usuario != %s
+                LIMIT 1;
+            """
+
+            usuario = "developer"
+
+        cursor.execute(query, (id_jugadora, fecha_sesion, turno, usuario))
         record = cursor.fetchone()
+
+        # if rol_actual == "developer":
+        #     st.write(f"🟡 Query ejecutada):")
+        #     st.code(query, language="sql")
+        #     st.json((id_jugadora, fecha_sesion, turno))
 
         # --- Convertir JSON a lista Python ---
         if record and record.get("partes_cuerpo_dolor"):
@@ -149,7 +188,7 @@ def get_record_for_player_day_turno_db(identificacion: str, fecha_sesion: str, t
         return record
 
     except Exception as e:
-        st.error(f":material/warning: Error al obtener registro de wellness: {e}")
+        st.error(f":material/warning: Error al obtener registro de wellness por dia y turno: {e}")
         return None
 
     finally:
@@ -161,7 +200,7 @@ def get_record_for_player_day_turno_db(identificacion: str, fecha_sesion: str, t
 def upsert_wellness_record_db(record: dict, modo: str = "checkin") -> bool:
     """
     Inserta o actualiza un registro de wellness en la base de datos MySQL.
-    Criterio de unicidad: (identificacion, fecha_sesion, turno)
+    Criterio de unicidad: (id_jugadora, fecha_sesion, turno)
 
     - Si modo == "checkin": inserta o actualiza todos los campos del registro.
     - Si modo == "checkout": solo actualiza los campos del post-entrenamiento
@@ -190,7 +229,7 @@ def upsert_wellness_record_db(record: dict, modo: str = "checkin") -> bool:
         # ============================================================
         check_query = """
             SELECT id FROM wellness
-            WHERE identificacion = %s
+            WHERE id_jugadora = %s
               AND fecha_sesion = %s
               AND turno = %s
             LIMIT 1;
@@ -198,7 +237,7 @@ def upsert_wellness_record_db(record: dict, modo: str = "checkin") -> bool:
         cursor.execute(
             check_query,
             (
-                record.get("identificacion"),
+                record.get("id_jugadora"),
                 fecha_sesion,
                 record.get("turno"),
             ),
@@ -278,12 +317,12 @@ def upsert_wellness_record_db(record: dict, modo: str = "checkin") -> bool:
 
             insert_query = """
                 INSERT INTO wellness (
-                    identificacion, fecha_sesion, tipo, turno, periodizacion_tactica,
+                    id_jugadora, fecha_sesion, tipo, turno, periodizacion_tactica,
                     id_tipo_estimulo, id_tipo_readaptacion, recuperacion, fatiga, sueno,
                     stress, dolor, partes_cuerpo_dolor, minutos_sesion, rpe, ua,
                     en_periodo, observacion, usuario
                 ) VALUES (
-                    %(identificacion)s, %(fecha_sesion)s, %(tipo)s, %(turno)s, %(periodizacion_tactica)s,
+                    %(id_jugadora)s, %(fecha_sesion)s, %(tipo)s, %(turno)s, %(periodizacion_tactica)s,
                     %(id_tipo_estimulo)s, %(id_tipo_readaptacion)s, %(recuperacion)s, %(fatiga)s, %(sueno)s,
                     %(stress)s, %(dolor)s, %(partes_cuerpo_dolor)s, %(minutos_sesion)s, %(rpe)s, %(ua)s,
                     %(en_periodo)s, %(observacion)s, %(usuario)s
@@ -466,7 +505,7 @@ def get_records_plus_players_db(plantel: str = None) -> pd.DataFrame:
         conn.close()
 
 @st.cache_data(ttl=3600)  # cachea por 1 hora (ajústalo según tu frecuencia de actualización)
-def load_jugadoras_db() -> tuple[pd.DataFrame | None, str | None]:
+def load_jugadoras_db() -> pd.DataFrame | None:
     """
     Carga jugadoras desde la base de datos (futbolistas + informacion_futbolistas).
     
@@ -480,7 +519,7 @@ def load_jugadoras_db() -> tuple[pd.DataFrame | None, str | None]:
     try:
         query = """
         SELECT 
-            f.id AS identificacion,
+            f.id AS id_jugadora,
             f.nombre,
             f.apellido,
             f.competicion AS plantel,
@@ -513,7 +552,7 @@ def load_jugadoras_db() -> tuple[pd.DataFrame | None, str | None]:
 
         # Reordenar columnas
         orden = [
-            "identificacion", "nombre_jugadora", "nombre", "apellido", "posicion", "plantel",
+            "id_jugadora", "nombre_jugadora", "nombre", "apellido", "posicion", "plantel",
             "dorsal", "nacionalidad", "altura", "peso", "fecha_nacimiento",
             "sexo", "foto_url"
         ]
@@ -522,11 +561,11 @@ def load_jugadoras_db() -> tuple[pd.DataFrame | None, str | None]:
 
         #st.dataframe(df)
 
-        return df, None
+        return df
 
     except Exception as e:
-        return None, f":material/warning: Error al cargar jugadoras: {e}"
-
+            st.error(f":material/warning: Error al cargar jugadoras: {e}")
+            st.stop()
     finally:
         conn.close()
 
@@ -559,7 +598,8 @@ def load_competiciones_db() -> tuple[pd.DataFrame | None, str | None]:
         cursor.close()
 
         if df.empty:
-            return None, ":material/warning: No se encontraron registros en la tabla 'plantel'."
+            st.error(":material/warning: No se encontraron registros en la tabla 'plantel'.")
+            st.stop()
 
         # Limpieza básica
         df["nombre"] = df["nombre"].astype(str).str.strip().str.title()
@@ -569,11 +609,11 @@ def load_competiciones_db() -> tuple[pd.DataFrame | None, str | None]:
         orden = ["id", "nombre", "codigo"]
         df = df[[col for col in orden if col in df.columns]]
 
-        return df, None
+        return df
 
     except Exception as e:
-        return None, f":material/warning: Error al cargar competiciones: {e}"
-
+        st.error(f":material/warning: Error al cargar competiciones: {e}")
+        st.stop()
     finally:
         conn.close()
 

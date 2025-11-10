@@ -1,8 +1,12 @@
 import streamlit as st
 import src.config as config
 config.init_config()
+
 from src.ui_components import selection_header
-from src.auth import init_app_state, login_view, menu, validate_login
+
+from src.auth_system.auth_core import init_app_state, validate_login
+from src.auth_system.auth_ui import login_view, menu
+
 from src.db_records import delete_wellness, load_jugadoras_db, load_competiciones_db, get_records_wellness_db
 
 init_app_state()
@@ -21,16 +25,12 @@ st.header("Administrador de :red[registros]", divider=True)
 menu()
 
 # Load reference data
-jug_df, jug_error = load_jugadoras_db()
-comp_df, comp_error = load_competiciones_db()
+jug_df = load_jugadoras_db()
+comp_df = load_competiciones_db()
 
-if jug_error:
-    st.error(jug_error)
-    st.stop()
+wellness_df = get_records_wellness_db()
 
-jugadora, tipo, turno, start, end = selection_header(jug_df, comp_df, modo="reporte")
-
-records = get_records_wellness_db()
+records, jugadora, tipo, turno, start, end = selection_header(jug_df, comp_df, wellness_df, modo="reporte")
 
 if records.empty:
     st.error("No se encontraron registros")

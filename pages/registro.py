@@ -4,12 +4,16 @@ import src.config as config
 
 config.init_config()
 
-from src.auth import init_app_state, login_view, menu
+from src.auth_system.auth_core import init_app_state, validate_login
+from src.auth_system.auth_ui import login_view, menu
+
+#from src.auth import init_app_state, login_view, menu
 from src.checkin_ui import checkin_form
 from src.db_records import load_jugadoras_db, load_competiciones_db, upsert_wellness_record_db, get_record_for_player_day_turno_db
 from src.check_out import checkout_form
 
 init_app_state()
+validate_login()
 
 from src.ui_components import preview_record, selection_header
 from src.schema import new_base_record
@@ -24,23 +28,19 @@ st.header('Registro :red[:material/check_in_out:] ', divider=True)
 menu()
 
 # Load reference data
-jug_df, jug_error = load_jugadoras_db()
-comp_df, comp_error = load_competiciones_db()
+jug_df = load_jugadoras_db()
+comp_df = load_competiciones_db()
 
-if jug_error:
-    st.error(jug_error)
-    st.stop()
-
-jugadora, tipo, turno, _, _ = selection_header(jug_df, comp_df)
-
-st.divider()
+jugadora, tipo, turno = selection_header(jug_df, comp_df)
 
 if not jugadora:
     st.info("Selecciona una jugadora para continuar.")
     st.stop()
 
+st.divider()
+
 record = new_base_record(
-    id_jugadora=str(jugadora["identificacion"]),
+    id_jugadora=str(jugadora["id_jugadora"]),
     username=st.session_state['auth']['username'],
     tipo="checkin" if tipo == "Check-in" else "checkout",
 )
@@ -48,14 +48,12 @@ record["turno"] = turno or ""
 
 # Notice if will update existing record of today and turno
 existing_today = (
-    get_record_for_player_day_turno_db(record["identificacion"], record["fecha_sesion"], record.get("turno", ""))
+    get_record_for_player_day_turno_db(record["id_jugadora"], record["fecha_sesion"], record.get("turno", ""))
     if jugadora else None
 )
 
 if existing_today:
-    st.info(
-        "Ya existe un registro para esta jugadora hoy en el mismo turno. Al guardar se actualizará el registro existente (upsert)."
-    )
+    st.info("Ya existe un registro para esta jugadora hoy en el mismo turno. Al guardar se actualizará el registro existente (upsert).")
 
 is_valid = False
 
@@ -67,6 +65,10 @@ else:
         st.stop()
         
     record, is_valid, validation_msg = checkout_form(record)
+
+if not is_valid and validation_msg:
+    st.error(validation_msg)
+    st.stop()
 
 if st.session_state["auth"]["rol"].lower() == "developer":
     st.divider()
@@ -86,13 +88,12 @@ if submitted:
             if success:
                 st.success(":material/done_all: Registro guardado/actualizado correctamente.")
                 time.sleep(4)
+                st.rerun()
             else:
                 st.error(":material/warning: Error al guardar el registro.")
-            #st.rerun()
+            
     except Exception as e:
         # Captura cualquier error inesperado
         st.error(f":material/warning: Error inesperado al guardar el registros: {e}")
         st.session_state.form_submitted = False
 
-if not is_valid and validation_msg:
-    st.error(validation_msg)
