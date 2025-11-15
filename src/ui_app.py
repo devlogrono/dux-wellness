@@ -1,9 +1,10 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 from datetime import date, timedelta
 
 from src.styles import WELLNESS_COLOR_NORMAL, WELLNESS_COLOR_INVERTIDO, get_color_wellness
+from src.util import ordenar_df
+from src.i18n.i18n import t
 
 W_COLS = ["recuperacion", "energia", "sueno", "stress", "dolor"]
 
@@ -20,31 +21,32 @@ def _coerce_numeric(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
 
 def compute_player_wellness_means(df_in_period_checkin: pd.DataFrame) -> pd.DataFrame:
     """
-    Devuelve por Jugadora:
+    Devuelve por nombre_jugadora:
       - prom_w_1_5: promedio (1-5) de las 5 variables wellness
       - dolor_mean: promedio de dolor (1-5)
       - en_riesgo: bool con la lógica consensuada
     Solo usa registros tipo 'checkin' del periodo filtrado.
     """
     if df_in_period_checkin.empty:
-        return pd.DataFrame(columns=["Jugadora", "prom_w_1_5", "dolor_mean", "en_riesgo"])
+        return pd.DataFrame(columns=["nombre_jugadora", "prom_w_1_5", "dolor_mean", "en_riesgo"])
 
     df = df_in_period_checkin.copy()
-    df["Jugadora"] = (df["nombre"].fillna("") + " " + df["apellido"].fillna("")).str.strip()
+    #df["nombre_jugadora"] = (df["nombre"].fillna("") + " " + df["apellido"].fillna("")).str.strip()
     df = _coerce_numeric(df, W_COLS)
 
-    g = df.groupby("Jugadora", as_index=False)[W_COLS].mean(numeric_only=True)
+    g = df.groupby("nombre_jugadora", as_index=False)[W_COLS].mean(numeric_only=True)
     g["prom_w_1_5"] = g[W_COLS].mean(axis=1, skipna=True)
     g["dolor_mean"] = g["dolor"]
     g["en_riesgo"] = (g["prom_w_1_5"] * 5 < 15) | (g["dolor_mean"] > 3)
 
-    return g[["Jugadora", "prom_w_1_5", "dolor_mean", "en_riesgo"]]
+    return g[["nombre_jugadora", "prom_w_1_5", "dolor_mean", "en_riesgo"]]
 
 # ============================================================
 # 📅 GESTIÓN DE PERIODOS
 # ============================================================
 
 def get_default_period(df: pd.DataFrame) -> str:
+
     hoy = date.today()
     dias_disponibles = df["fecha_dia"].unique()
     if hoy in dias_disponibles:
@@ -56,22 +58,30 @@ def get_default_period(df: pd.DataFrame) -> str:
     else:
         return "Mes"
 
-
 def filter_df_by_period(df: pd.DataFrame, periodo: str):
-    fecha_max = df["fecha_hora_registro"].max()
+    fecha_max = df["fecha_sesion"].max()
+
     if periodo == "Hoy":
         filtro = df["fecha_dia"] == date.today()
-        texto = "el día de hoy"
+        texto = t("el día de hoy")
     elif periodo == "Último día":
-        filtro = df["fecha_dia"] == fecha_max.date()
-        texto = "el último día"
+        filtro = df["fecha_dia"] == fecha_max
+        texto = t("el último día")
     elif periodo == "Semana":
-        filtro = df["fecha_hora_registro"] >= (fecha_max - pd.Timedelta(days=7))
-        texto = "la última semana"
+        filtro = df["fecha_sesion"] >= (fecha_max - pd.Timedelta(days=7))
+        texto = t("la última semana")
     else:
-        filtro = df["fecha_hora_registro"] >= (fecha_max - pd.Timedelta(days=30))
-        texto = "el último mes"
-    return df[filtro], texto
+        filtro = df["fecha_sesion"] >= (fecha_max - pd.Timedelta(days=30))
+        texto = t("el último mes")
+
+    # --- Aplicar filtro ---
+    df_filtrado = df[filtro].copy()
+
+    # --- Ordenar por fecha (más reciente primero) ---
+    df_filtrado = df_filtrado.sort_values(by="fecha_sesion", ascending=False).reset_index(drop=True)
+    df_filtrado.drop(columns=["id"], inplace=True)
+
+    return df_filtrado, texto
 
 
 # ============================================================
@@ -157,17 +167,17 @@ delta_ua, chart_ua, alertas_count, total_jugadoras, alertas_pct, chart_alertas, 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric(
-            "Bienestar promedio del grupo",
+            t("Bienestar promedio del grupo"),
             f"{wellness_prom if not pd.isna(wellness_prom) else 0}/25",
             f"{delta_wellness:+.1f}%",
             chart_data=chart_wellness,
             chart_type="area",
             border=True,
-            help=f"Promedio de bienestar global ({articulo})."
+            help=f"{t('Promedio de bienestar global')} ({articulo})."
         )
     with col2:
         st.metric(
-            "Esfuerzo percibido promedio (RPE)",
+            t("Esfuerzo percibido promedio (RPE)"),
             f"{rpe_prom if not pd.isna(rpe_prom) else 0}",
             f"{delta_rpe:+.1f}%",
             chart_data=chart_rpe,
@@ -177,7 +187,7 @@ delta_ua, chart_ua, alertas_count, total_jugadoras, alertas_pct, chart_alertas, 
         )
     with col3:
         st.metric(
-            "Carga interna total (UA)",
+            t("Carga interna total (UA)"),
             ua_total,
             f"{delta_ua:+.1f}%",
             chart_data=chart_ua,
@@ -186,15 +196,15 @@ delta_ua, chart_ua, alertas_count, total_jugadoras, alertas_pct, chart_alertas, 
         )
     with col4:
         st.metric(
-            "Jugadoras en Zona Roja",
+            t("Jugadoras en Zona Roja"),
             f"{alertas_count}/{total_jugadoras}",
             f"{delta_alertas:+.1f}%",
             chart_data=chart_alertas,
             chart_type="bar",
             border=True,
             delta_color="inverse",
-            help=f"{alertas_count} de {total_jugadoras} jugadoras ({alertas_pct}%) "
-                 f"con bienestar promedio <15 o dolor >3 ({articulo})."
+            help=f"{alertas_count} {t('de')} {total_jugadoras} {t('jugadoras')} ({alertas_pct}%) "
+                 f"{t('con bienestar promedio <15 o dolor >3')} ({articulo})."
         )
 
 def mostrar_resumen_tecnico(wellness_prom: float, rpe_prom: float, ua_total: float,
@@ -244,53 +254,53 @@ def show_interpretation(wellness_prom, rpe_prom, ua_total, alertas_count, alerta
     # === Generar tabla interpretativa ===
     interpretacion_data = [
         {
-            "Métrica": "Índice de Bienestar Promedio",
-            "Valor": f"{wellness_prom if not pd.isna(wellness_prom) else 0}/25",
-            "Interpretación": (
-                "🟢 Óptimo (>20): El grupo mantiene un estado físico y mental adecuado. " if wellness_prom > 20 else
-                "🟡 Moderado (15-19): Existen signos leves de fatiga o estrés. " if 15 <= wellness_prom <= 19 else
-                "🔴 Alerta (<15): El grupo muestra fatiga o malestar significativo. "
+            t("Métrica"): t("Índice de Bienestar Promedio"),
+            t("Valor"): f"{wellness_prom if not pd.isna(wellness_prom) else 0}/25",
+            t("Interpretación"): (
+                t("🟢 Óptimo (>20): El grupo mantiene un estado físico y mental adecuado. ") if wellness_prom > 20 else
+                t("🟡 Moderado (15-19): Existen signos leves de fatiga o estrés. ") if 15 <= wellness_prom <= 19 else
+                t("🔴 Alerta (<15): El grupo muestra fatiga o malestar significativo. ")
             )
         },
         {
-            "Métrica": "RPE Promedio",
-            "Valor": f"{rpe_prom if not pd.isna(rpe_prom) else 0}",
-            "Interpretación": (
-                "🟢 Controlado (<6): El esfuerzo percibido está dentro de los rangos esperados. " if rpe_prom < 6 else
-                "🟡 Medio (6-7): Carga elevada, pero dentro de niveles aceptables. " if 6 <= rpe_prom <= 7 else
-                "🔴 Alto (>7): Percepción de esfuerzo muy alta. "
+            t("Métrica"): t("RPE Promedio"),
+            t("Valor"): f"{rpe_prom if not pd.isna(rpe_prom) else 0}",
+            t("Interpretación"): (
+                t("🟢 Controlado (<6): El esfuerzo percibido está dentro de los rangos esperados. ") if rpe_prom < 6 else
+                t("🟡 Medio (6-7): Carga elevada, pero dentro de niveles aceptables. ") if 6 <= rpe_prom <= 7 else
+                t("🔴 Alto (>7): Percepción de esfuerzo muy alta. ")
             )
         },
         {
-            "Métrica": "Carga Total (UA)",
-            "Valor": f"{ua_total}",
-            "Interpretación": (
-                "🟢 Estable: La carga total se mantiene dentro de los márgenes planificados. " if abs(delta_ua) < 10 else
-                "🟡 Variación moderada (10-20%): Ajustes leves de carga detectados. " if 10 <= abs(delta_ua) <= 20 else
-                "🔴 Variación fuerte (>20%): Aumento o descenso brusco de la carga. "
+            t("Métrica"): t("Carga Total (UA)"),
+            t("Valor"): f"{ua_total}",
+            t("Interpretación"): (
+                t("🟢 Estable: La carga total se mantiene dentro de los márgenes planificados. ") if abs(delta_ua) < 10 else
+                t("🟡 Variación moderada (10-20%): Ajustes leves de carga detectados. ") if 10 <= abs(delta_ua) <= 20 else
+                t("🔴 Variación fuerte (>20%): Aumento o descenso brusco de la carga. ")
             )
         },
         {
-            "Métrica": "Jugadoras en Zona Roja",
-            "Valor": f"{alertas_count}/{total_jugadoras} ({alertas_pct}%)",
-            "Interpretación": (
-                "🟢 Grupo estable: Ninguna jugadora muestra indicadores de riesgo. " if alertas_pct == 0 else
-                "🟡 Seguimiento leve (<15%): Algunas jugadoras presentan fatiga o molestias leves. " if alertas_pct <= 15 else
-                "🔴 Riesgo elevado (>15%): Varios casos de fatiga o dolor detectados. "
+            t("Métrica"): t("Jugadoras en Zona Roja"),
+            t("Valor"): f"{alertas_count}/{total_jugadoras} ({alertas_pct}%)",
+            t("Interpretación"): (
+                t("🟢 Grupo estable: Ninguna jugadora muestra indicadores de riesgo. ") if alertas_pct == 0 else
+                t("🟡 Seguimiento leve (<15%): Algunas jugadoras presentan fatiga o molestias leves. ") if alertas_pct <= 15 else
+                t("🔴 Riesgo elevado (>15%): Varios casos de fatiga o dolor detectados. ")
             )
         }
     ]
 
-    with st.expander("Interpretación de las métricas"):
+    with st.expander(t("Interpretación de las métricas")):
         df_interpretacion = pd.DataFrame(interpretacion_data)
-        df_interpretacion["Interpretación"] = df_interpretacion["Interpretación"].str.replace("\n", "<br>")
+        df_interpretacion[t("Interpretación")] = df_interpretacion[t("Interpretación")].str.replace("\n", "<br>")
         #st.markdown("**Interpretación de las métricas**")
         st.dataframe(df_interpretacion, hide_index=True)
 
         st.caption(
-        "🟢 / 🔴 Los colores en los gráficos muestran *variaciones* respecto al periodo anterior "
+        t("🟢 / 🔴 Los colores en los gráficos muestran *variaciones* respecto al periodo anterior "
         "(🔺 sube, 🔻 baja). Los colores en la interpretación reflejan *niveles fisiológicos* "
-        "según umbrales deportivos."
+        "según umbrales deportivos.")
     )
 
 
@@ -314,9 +324,9 @@ def generar_resumen_periodo(df: pd.DataFrame):
     # ======================================================
     # 🧱 Base y preprocesamiento
     # ======================================================
-    df_periodo["Jugadora"] = (
-        df_periodo["nombre"].fillna("") + " " + df_periodo["apellido"].fillna("")
-    ).str.strip()
+    #df_periodo["Jugadora"] = (
+    #    df_periodo["nombre"].fillna("") + " " + df_periodo["apellido"].fillna("")
+    #).str.strip()
 
     cols_wellness = ["recuperacion", "energia", "sueno", "stress", "dolor"]
 
@@ -327,7 +337,7 @@ def generar_resumen_periodo(df: pd.DataFrame):
 
     # --- Promedios generales por jugadora ---
     resumen = (
-        df_periodo.groupby("Jugadora", as_index=False)
+        df_periodo.groupby("nombre_jugadora", as_index=False)
         .agg({
             "recuperacion": "mean",
             "energia": "mean",
@@ -349,6 +359,28 @@ def generar_resumen_periodo(df: pd.DataFrame):
         .infer_objects(copy=False)
     )
 
+    # --- Añadir columnas de conteo ---
+    registros_por_jugadora = (
+        df_periodo.groupby("nombre_jugadora", as_index=False)
+        .agg(Registros_periodo=("fecha_sesion", "count"))
+    )
+
+    dias_periodo = df_periodo["fecha_sesion"].nunique()
+    registros_por_jugadora["Dias_periodo"] = dias_periodo
+
+    # Unir al resumen
+    resumen = resumen.merge(registros_por_jugadora, on="nombre_jugadora", how="left")
+
+    # Crear columna combinada tipo "15 / 15"
+    resumen["Registros/Días"] = (
+        resumen["Registros_periodo"].astype(int).astype(str) + " / " + resumen["Dias_periodo"].astype(int).astype(str)
+    )
+
+    columna = resumen.pop("Registros/Días")       # Extrae la columna
+    resumen.insert(1, "Registros/Días", columna)  # La inserta en la posición 1
+
+    # Eliminar columnas intermedias si no quieres mostrarlas
+    resumen.drop(columns=["Registros_periodo", "Dias_periodo"], inplace=True)
 
     # --- Calcular Promedio Wellness (1–5) ---
     resumen["Promedio_Wellness"] = resumen[
@@ -356,13 +388,13 @@ def generar_resumen_periodo(df: pd.DataFrame):
     ].mean(axis=1, skipna=True)
 
     # ======================================================
-    # ⚠️ Cálculo de riesgo coherente con compute_player_wellness_means
+    # Cálculo de riesgo coherente con compute_player_wellness_means
     # ======================================================
     try:
         riesgo_df = compute_player_wellness_means(df_periodo)
         if "en_riesgo" in riesgo_df.columns:
-            resumen = pd.merge(resumen, riesgo_df[["Jugadora", "en_riesgo"]],
-                               on="Jugadora", how="left")
+            resumen = pd.merge(resumen, riesgo_df[["nombre_jugadora", "en_riesgo"]],
+                               on="nombre_jugadora", how="left")
             resumen["En_riesgo"] = resumen["en_riesgo"].fillna(False)
             resumen.drop(columns=["en_riesgo"], inplace=True)
         else:
@@ -413,24 +445,112 @@ def generar_resumen_periodo(df: pd.DataFrame):
         ]
 
     # ======================================================
-    # 📊 Mostrar tabla final
+    # Mostrar tabla final
     # ======================================================
+    resumen = resumen.rename(columns={
+        "nombre_jugadora": t("Jugadora"),
+        "Registros/Días": t("Registros/Días"),
+        "Recuperación": t("Recuperación"),
+        "Energía": t("Energía"),
+        "Sueño": t("Sueño"),
+        "Estrés": t("Estrés"),
+        "Dolor": t("Dolor"),
+        "Promedio_Wellness": t("Promedio Wellness"),
+        "RPE_promedio": t("RPE promedio"),
+        "UA_total": t("UA total"),
+        "En_riesgo": t("En riesgo")
+    })
+
     styled = (
         resumen.style
-        .apply(color_por_variable, subset=["Recuperación", "Energía", "Sueño", "Estrés", "Dolor"])
-        .apply(color_promedios, subset=["Promedio_Wellness"])
-        .apply(color_rpe_ua, subset=["RPE_promedio"])
-        .apply(color_rpe_ua, subset=["UA_total"])
-        .apply(color_riesgo, subset=["En_riesgo"])
+        .apply(color_por_variable, subset=[t("Recuperación"), t("Energía"), t("Sueño"), t("Estrés"), t("Dolor")])
+        .apply(color_promedios, subset=[t("Promedio Wellness")])
+        .apply(color_rpe_ua, subset=[t("RPE promedio")])
+        .apply(color_rpe_ua, subset=[t("UA total")])
+        .apply(color_riesgo, subset=[t("En riesgo")])
         .format(precision=2, na_rep="")
     )
 
     st.dataframe(styled, hide_index=True)
 
-    st.caption(
-        ":material/info: **Criterio de riesgo en la tabla:** "
-        "una jugadora se considera *en riesgo* si el **promedio de bienestar (1-5x5) < 15 puntos** "
-        "o si la variable **Dolor > 3**. "
-        "Este criterio combina el **riesgo global** (fatiga / bienestar bajo) y el **riesgo localizado** (molestias o dolor elevado)."
-    )
+    # st.caption(
+    #     ":material/info: **Criterio de riesgo en la tabla:** "
+    #     "una jugadora se considera *en riesgo* si el **promedio de bienestar (1-5x5) < 15 puntos** "
+    #     "o si la variable **Dolor > 3**. "
+    #     "Este criterio combina el **riesgo global** (fatiga / bienestar bajo) y el **riesgo localizado** (molestias o dolor elevado)."
+    # )
 
+    st.caption(t(":material/info: **Criterio de riesgo en la tabla:** una jugadora se considera *en riesgo* si el **promedio de bienestar (1-5x5) < 15 puntos** o si la variable **Dolor > 3**. Este criterio combina el **riesgo global** (fatiga / bienestar bajo) y el **riesgo localizado** (molestias o dolor elevado)."))
+
+
+def _filtrar_pendientes(df_periodo: pd.DataFrame, df_jugadoras: pd.DataFrame, tipo: str) -> pd.DataFrame:
+    """
+    Devuelve las jugadoras que no han realizado un tipo de registro específico
+    (checkin o checkout) en el periodo seleccionado.
+
+    Lógica:
+        - Si una jugadora tiene checkout → se asume que también hizo checkin.
+        - Si tiene checkin pero no checkout → pendiente de checkout.
+        - Si no tiene ninguno → pendiente en ambos lados.
+
+    Parámetros:
+        df_periodo (pd.DataFrame): DataFrame de registros.
+        df_jugadoras (pd.DataFrame): Lista completa de jugadoras.
+        tipo (str): 'checkin' o 'checkout'.
+
+    Retorna:
+        pd.DataFrame: Jugadoras pendientes, con columnas filtradas y ordenadas.
+    """
+    tipo = tipo.lower().strip()
+
+    # --- Normalizar columna tipo ---
+    df_periodo = df_periodo.copy()
+    df_periodo["tipo"] = df_periodo["tipo"].astype(str).str.lower()
+
+    # --- IDs según tipo ---
+    ids_checkin = df_periodo[df_periodo["tipo"] == "checkin"]["id_jugadora"].unique()
+    ids_checkout = df_periodo[df_periodo["tipo"] == "checkout"]["id_jugadora"].unique()
+
+    # --- Lógica principal ---
+    if tipo == "checkin":
+        # Pendiente de checkin → jugadoras sin ningún registro
+        pendientes_ids = [jid for jid in df_jugadoras["id_jugadora"].unique()
+                          if jid not in ids_checkin and jid not in ids_checkout]
+    else:  # tipo == "checkout"
+        # Pendiente de checkout → jugadoras con checkin pero sin checkout
+        pendientes_ids = [jid for jid in df_jugadoras["id_jugadora"].unique()
+                          if jid in ids_checkin and jid not in ids_checkout
+                          or (jid not in ids_checkin and jid not in ids_checkout)]
+
+    # --- Filtrar jugadoras ---
+    pendientes = df_jugadoras[df_jugadoras["id_jugadora"].isin(pendientes_ids)].copy()
+
+    # --- Ordenar ---
+    pendientes = ordenar_df(pendientes, "nombre_jugadora")
+
+    # --- Seleccionar columnas finales ---
+    columnas_finales = ["id_jugadora", "nombre_jugadora", "posicion", "plantel"]
+    pendientes = pendientes[[c for c in columnas_finales if c in pendientes.columns]]
+
+    return pendientes
+
+def get_pendientes_check(df_periodo: pd.DataFrame, df_jugadoras: pd.DataFrame):
+    """
+    Devuelve dos DataFrames:
+    - Jugadoras sin check-in
+    - Jugadoras sin check-out
+    """
+    if "id_jugadora" not in df_periodo.columns or "id_jugadora" not in df_jugadoras.columns:
+        return pd.DataFrame(), pd.DataFrame()
+
+    #st.dataframe(df_periodo)
+
+    df_periodo = df_periodo.copy()
+    # --- Normalizar columna tipo ---
+    df_periodo["tipo"] = df_periodo["tipo"].astype(str).str.lower()
+
+    # --- Obtener pendientes con la función auxiliar ---
+    pendientes_in = _filtrar_pendientes(df_periodo, df_jugadoras, "checkin")
+    pendientes_out = _filtrar_pendientes(df_periodo, df_jugadoras, "checkout")
+
+    return pendientes_in, pendientes_out
