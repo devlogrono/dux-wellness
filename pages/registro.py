@@ -51,8 +51,8 @@ existing_today = (
     if jugadora else None
 )
 
-if existing_today:
-    st.info(t("Ya existe un registro para esta jugadora hoy en el mismo turno. Al guardar se actualizará el registro existente (upsert)."))
+#if existing_today:
+#    st.info(t("Ya existe un registro para esta jugadora hoy en el mismo turno. Al guardar se actualizará el registro existente (upsert)."))
 
 is_valid = False
 
