@@ -1,11 +1,6 @@
 import streamlit as st
-import json
-import random
-import datetime
-from pathlib import Path
-import pandas as pd
 
-import src.config as config
+import src.app_config.config as config
 config.init_config()
 
 from src.auth_system.auth_core import init_app_state, validate_login
