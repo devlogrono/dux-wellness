@@ -127,4 +127,9 @@ with tab2:
         start=start,
         end=end,
     )
+
+    if ausencias_df_filtrado.empty:
+        st.error(t("No se encontraron registros"))
+        st.stop()
+        
     absents_summary(ausencias_df_filtrado)
