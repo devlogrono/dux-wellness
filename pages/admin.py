@@ -1,55 +1,130 @@
 import streamlit as st
-
 import src.app_config.config as config
 config.init_config()
 
+from src.db.db_catalogs import load_catalog_list_db
+from src.ui.ui_components import selection_header, filtrar_registros
+from src.i18n.i18n import t
 from src.auth_system.auth_core import init_app_state, validate_login
 from src.auth_system.auth_ui import login_view, menu
+from src.ui.absents_ui import absents_summary
 
-#from src.auth import init_app_state, login_view, menu, validate_login
-from src.io_files import load_jugadoras
-from src.synthetic import generate_synthetic_full
+from src.db.db_records import (
+    delete_wellness, load_jugadoras_db, load_competiciones_db, get_records_db, load_ausencias_activas_db)
 
 init_app_state()
 validate_login()
 
+if st.session_state["auth"]["rol"].lower() not in ["admin", "developer"]:
+    st.switch_page("app.py")
+    
 # Authentication gate
 if not st.session_state["auth"]["is_logged_in"]:
     login_view()
     st.stop()
+
 menu()
 
-st.header("Simulador de :red[Registros]", divider="red")
+st.header(t("Administrador de :red[registros]"), divider="red")
 
-col1, col2 = st.columns(2)
-with col1:
-    days = st.number_input("Número de días a generar", min_value=1, max_value=30, value=10, step=1)
-with col2:
-    seed = st.number_input("Semilla aleatoria (seed)", min_value=0, value=42, step=1)
+# Load reference data
+jug_df = load_jugadoras_db()
+comp_df = load_competiciones_db()
+wellness_df = get_records_db()
+tipo_ausencia_df = load_catalog_list_db("tipo_ausencia", as_df=True)
+ausencias_df = load_ausencias_activas_db(activas=False)
 
-# --- Botón principal ---
-if st.button("Generar registros aleatorios", type="primary"):
-    try:
-        result = generate_synthetic_full(days=days, seed=seed)
-        tipo = "Completo (check-in y check-out)"
+records, jugadora, tipo, turno, start, end = selection_header(jug_df, comp_df, wellness_df, modo="reporte")
 
-        st.success(f"✅ Generación de registros {tipo} completada con éxito.")
+if records.empty:
+    st.error(t("No se encontraron registros"))
+    st.stop()
 
-        # Mostrar resumen
-        st.markdown("### Resumen de generación")
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Días simulados", result.get("days", 0))
-        col2.metric("Registros creados", result.get("created", result.get("total_upserts", 0)))
-        col3.metric("Backups generados", "✅" if result.get("backup") else "—")
+tab1, tab2 = st.tabs([ "Wellness :material/check_in_out:", "Ausencias :material/event_busy:"])
 
-        st.write("**Archivo destino:**", result.get("target", "N/D"))
-        if result.get("backup"):
-            st.info(f"Backup guardado en: `{result['backup']}`")
+with tab1:
 
-    except Exception as e:
-        st.error(f"❌ Error al generar registros: {e}")
+    disabled = records.columns.tolist()
 
+    columna = t("seleccionar")
 
-data, error = load_jugadoras()
-#df = pd.DataFrame(data)
-#st.dataframe(df)
+    # --- Agregar columna de selección si no existe ---
+    if columna not in records.columns:
+        records.insert(0, columna, False)
+
+    #records_vista = records.drop("id", axis=1)
+
+    df_edited = st.data_editor(records, 
+            column_config={
+                columna: st.column_config.CheckboxColumn(columna, default=False)},   
+            num_rows="fixed", hide_index=True, disabled=disabled)
+
+    ids_seleccionados = df_edited.loc[df_edited[columna], "id"].tolist()
+
+    if st.session_state["auth"]["rol"].lower() in ["developer"]:
+        st.write(t("Registros seleccionados:"), ids_seleccionados)
+
+    #st.dataframe(records, hide_index=True)
+    # save_if_modified(records, df_edited)
+    csv_data = records.to_csv(index=False).encode("utf-8")
+
+    exito, mensaje = False, ""
+    # ===============================
+    # 🔸 Diálogo de confirmación
+    # ===============================
+    @st.dialog(t("Confirmar"), width="small")
+    def dialog_eliminar():
+        st.warning(f"¿{t('Está seguro de eliminar')} {len(ids_seleccionados)} {t('elemento')}(s)?")
+
+        _, col2, col3 = st.columns([1.8, 1, 1])
+        with col2:
+            if st.button(t(":material/cancel: Cancelar")):
+                st.rerun()
+        with col3:
+            if st.button(t(":material/delete: Eliminar"), type="primary"):
+                exito, mensaje = delete_wellness(ids_seleccionados)
+
+                if exito:
+                    # Marcar para recarga
+                    st.session_state["reload_flag"] = True
+
+                st.rerun()
+
+    if st.session_state.get("reload_flag") and exito:     
+        st.success(mensaje)
+        st.session_state["reload_flag"] = False
+
+    col1, col2, col3, _, _ = st.columns([1.6, 1.8, 2, 1, 1])
+    with col1:
+        # --- Botón principal para abrir el diálogo ---
+        if st.button(t(":material/delete: Eliminar seleccionados"), disabled=len(ids_seleccionados) == 0):
+            dialog_eliminar()
+    with col2:
+        st.download_button(
+                label=t(":material/download: Descargar registros en CSV"),
+                data=csv_data, file_name="registros_wellness.csv", mime="text/csv")
+
+    if st.session_state["auth"]["rol"].lower() in ["developer"]:
+        with col3:
+                # Convertir a JSON (texto legible, sin índices)
+                json_data = records.to_json(orient="records", force_ascii=False, indent=2)
+                json_bytes = json_data.encode("utf-8")
+
+                # Botón de descarga
+                st.download_button(
+                    label=t(":material/download: Descargar registros en JSON"),
+                    data=json_bytes, file_name="registros_wellness.json", mime="application/json"
+                )
+
+with tab2:
+
+    ausencias_df_filtrado = filtrar_registros(
+        ausencias_df,
+        jugadora_opt=jugadora,
+        turno=turno,
+        modo="ausencias",
+        tipo=tipo,
+        start=start,
+        end=end,
+    )
+    absents_summary(ausencias_df_filtrado)

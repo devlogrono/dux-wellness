@@ -40,14 +40,15 @@ def menu():
 
         st.page_link("app.py", label=t("Inicio"), icon=":material/home:")
         st.subheader(t("Modo :material/dashboard:"))
-        st.page_link("pages/registro.py", label=t("Registro"), icon=":material/article_person:")
+        st.page_link("pages/wellness.py", label=t("Registro"), icon=":material/article_person:")
         st.subheader(t("Análisis y Estadísticas :material/query_stats:"))
         st.page_link("pages/individual.py", label=t("Individual"), icon=":material/accessible_menu:")
         st.page_link("pages/grupal.py", label=t("Grupal"), icon=":material/groups:")
 
         if st.session_state["auth"]["rol"].lower() in ["admin", "developer"]:
             st.subheader(t("Administración :material/settings:"))
-            st.page_link("pages/files.py", label=t("Registros"), icon=":material/docs:")
+            st.page_link("pages/admin.py", label=t("Registros"), icon=":material/docs:")
+            #st.page_link("pages/absents.py", label=t("Ausencias"), icon=":material/no_sim:")
 
         if st.button(t("Cerrar Sesión"), type="tertiary", icon=":material/logout:"):
             logout()

@@ -1,4 +1,10 @@
 {
+  "Todos": "Todos",
+  "Registrar ausencia": "Registrar ausência",
+  "Selecciona un motivo de ausencia para continuar.": "Selecione um motivo de ausência para continuar.",
+  "La fecha final no puede ser menor que la fecha inicial.": "A data final não pode ser anterior à data inicial.",
+  "Rehabilitación/readaptación" : "Reabilitação/Readaptação",
+  "Ausente": "Ausente",
   "Inicio": "Início",
   "Registro": "Registro",
   "Registros": "Registros",
@@ -131,6 +137,7 @@
   "Simulador de :red[Registros]": "Simulador de :red[Registros]",
   "Tipo de registro": "Tipo de registro",
   "Tipos de estímulo": "Tipos de estímulo",
+  "Tipos de carga": "Tipos de carga",
   "Turno": "Turno",
   "UA (RPE x minutos)": "UA (RPE x minutos)",
   "UA total último día": "UA total último dia",

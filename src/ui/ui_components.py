@@ -88,101 +88,152 @@ def selection_header(jug_df: pd.DataFrame, comp_df: pd.DataFrame, records_df: pd
     # ==================================================
     # 🧮 FILTRADO DEL DATAFRAME
     # ==================================================
-    df_filtrado = records_df.copy()
-    if not df_filtrado.empty:
-        # Filtrar por competición (plantel)
-        #if competicion and "codigo" in competicion:
-        #    df_filtrado = df_filtrado[df_filtrado["plantel"] == competicion["codigo"]]
+    df_filtrado = filtrar_registros(
+        records_df,
+        jugadora_opt=jugadora_opt,
+        turno=turno,
+        modo=modo,
+        tipo=tipo,   # solo si modo="registros"
+        start=start,
+        end=end,
+    )
 
-        # Filtrar por jugadora seleccionada
-        if jugadora_opt:
-            df_filtrado = df_filtrado[df_filtrado["id_jugadora"] == jugadora_opt["id_jugadora"]]
+    # df_filtrado = records_df.copy()
+    # if not df_filtrado.empty:
+    #     # Filtrar por competición (plantel)
+    #     #if competicion and "codigo" in competicion:
+    #     #    df_filtrado = df_filtrado[df_filtrado["plantel"] == competicion["codigo"]]
 
-        # Filtrar por turno
-        if turno:
-            df_filtrado = df_filtrado[df_filtrado["turno"] == turno]
+    #     # Filtrar por jugadora seleccionada
+    #     if jugadora_opt:
+    #         df_filtrado = df_filtrado[df_filtrado["id_jugadora"] == jugadora_opt["id_jugadora"]]
 
-        # Filtrar por tipo o fechas
-        if modo == "registros" and tipo:
-            df_filtrado = df_filtrado[df_filtrado["tipo"].str.lower() == tipo.lower()]
-        elif modo == "reporte" and start and end:
-            # Asegurar que fecha_sesion y start/end sean del mismo tipo (date)
-            if pd.api.types.is_datetime64_any_dtype(df_filtrado["fecha_sesion"]):
-                df_filtrado["fecha_sesion"] = df_filtrado["fecha_sesion"].dt.date
-            if hasattr(start, "to_pydatetime"):
-                start = start.date()
-            if hasattr(end, "to_pydatetime"):
-                end = end.date()
-            df_filtrado = df_filtrado[
-                (df_filtrado["fecha_sesion"] >= start) & (df_filtrado["fecha_sesion"] <= end)
-            ]
+    #     # Filtrar por turno
+    #     if turno != "Todos":
+    #         df_filtrado = df_filtrado[df_filtrado["turno"] == turno]
+
+    #     # Filtrar por tipo o fechas
+    #     if modo == "registros" and tipo:
+    #         df_filtrado = df_filtrado[df_filtrado["tipo"].str.lower() == tipo.lower()]
+    #     elif modo == "reporte" and start and end:
+    #         # Asegurar que fecha_sesion y start/end sean del mismo tipo (date)
+    #         if pd.api.types.is_datetime64_any_dtype(df_filtrado["fecha_sesion"]):
+    #             df_filtrado["fecha_sesion"] = df_filtrado["fecha_sesion"].dt.date
+    #         if hasattr(start, "to_pydatetime"):
+    #             start = start.date()
+    #         if hasattr(end, "to_pydatetime"):
+    #             end = end.date()
+    #         df_filtrado = df_filtrado[
+    #             (df_filtrado["fecha_sesion"] >= start) & (df_filtrado["fecha_sesion"] <= end)
+    #         ]
     
-        # print(df_filtrado["fecha_sesion"].head())
-        # print(df_filtrado["fecha_sesion"].dtype)
-        # print(type(df_filtrado["fecha_sesion"].iloc[0]))
+    # print(df_filtrado["fecha_sesion"].head())
+    # print(df_filtrado["fecha_sesion"].dtype)
+    # print(type(df_filtrado["fecha_sesion"].iloc[0]))
 
     return df_filtrado, jugadora_opt, tipo, turno, start, end
 
-# def selection_header_registro(jug_df: pd.DataFrame,comp_df: pd.DataFrame,records_df: pd.DataFrame = None):
+def filtrar_registros(
+    records_df: pd.DataFrame,
+    jugadora_opt: dict | None = None,
+    turno: str = "Todos",
+    modo: str = "registros",
+    tipo: str | None = None,
+    start=None,
+    end=None,
+) -> pd.DataFrame:
+    """
+    Filtra el DataFrame de registros según los criterios seleccionados.
 
-#     col_tipo, col_turno, col_plantel, col_jugadora = st.columns([1.6, 1, 2, 2])
+    Parámetros:
+        records_df: DataFrame original.
+        jugadora_opt: dict con datos de la jugadora seleccionada (o None).
+        turno: "Todos", "Turno 1", "Turno 2", "Turno 3".
+        modo: "registros" o "reporte".
+        tipo: string del tipo de registro (solo si modo="registros").
+        start: fecha inicio (solo si modo="reporte").
+        end: fecha fin (solo si modo="reporte").
 
-#     with col_tipo:
-#         tipo = st.radio(t("Tipo de registro"), options=["Check-in", "Check-out"], horizontal=True, index=0)
-#     with col_turno:
-#         turno_traducido = st.selectbox(
-#             t("Turno"),
-#             list(OPCIONES_TURNO.values()),
-#             index=0
-#         )
-#         turno = next(k for k, v in OPCIONES_TURNO.items() if v == turno_traducido)
+    Retorna:
+        DataFrame filtrado.
+    """
 
-#     with col_plantel:
-#         comp_options = comp_df.to_dict("records")
-#         comp_select = st.selectbox(
-#             t("Plantel"),
-#             options=comp_options,
-#             format_func=lambda x: x["nombre"] if isinstance(x, dict) else "",
-#             index=3,
-#             placeholder=t("Seleccione un plantel"),
-#         )
-#         codigo_comp = comp_select["codigo"]
+    df_filtrado = records_df.copy()
 
-#     with col_jugadora:
-#         jug_df_filtrado = jug_df[jug_df["plantel"] == codigo_comp].copy()
+    if df_filtrado.empty:
+        return df_filtrado
 
-#         if records_df is not None and not records_df.empty:
-#             # Asegurar tipo string en tipo y turno
-#             records_df["tipo"] = records_df["tipo"].astype(str).str.lower()
-#             records_df["turno"] = records_df["turno"].astype(str).str.lower()
+    # -------------------------
+    # Filtrar por jugadora
+    # -------------------------
+    if jugadora_opt:
+        df_filtrado = df_filtrado[
+            df_filtrado["id_jugadora"] == jugadora_opt["id_jugadora"]
+        ]
 
-#             #st.text(tipo.lower())
-#             # Filtrar registros existentes del tipo y turno seleccionados
-#             registros_filtrados = records_df[
-#                 (records_df["tipo"] == tipo.lower().replace("-", "")) &
-#                 (records_df["turno"] == turno.lower()) &
-#                 (records_df["fecha_sesion"] == datetime.date.today())
-#             ]
+    # -------------------------
+    # Filtrar por turno
+    # -------------------------
+    if turno != "Todos":
+        df_filtrado = df_filtrado[df_filtrado["turno"] == turno]
 
-#             # Jugadoras con registro de este tipo y turno
-#             jugadoras_con_registro = registros_filtrados["id_jugadora"].unique()
+    # -------------------------
+    # MODO: registros
+    # -------------------------
+    if modo == "registros" and tipo:
+        df_filtrado = df_filtrado[
+            df_filtrado["tipo"].str.lower() == tipo.lower()
+        ]
 
-#             # Excluirlas del selector
-#             jug_df_filtrado = jug_df_filtrado[
-#                 ~jug_df_filtrado["id_jugadora"].isin(jugadoras_con_registro)
-#             ]
+    # -------------------------
+    # MODO: reporte (rango de fechas)
+    # -------------------------
+    elif modo == "reporte" and start and end:
 
-#         jugadoras_options = jug_df_filtrado.to_dict("records")
+        # Normalizar tipos de fecha
+        if pd.api.types.is_datetime64_any_dtype(df_filtrado["fecha_sesion"]):
+            df_filtrado["fecha_sesion"] = df_filtrado["fecha_sesion"].dt.date
 
-#         jugadora_opt = st.selectbox(
-#             t("Jugadora"),
-#             options=jugadoras_options,
-#             format_func=lambda x: x["nombre_jugadora"] if isinstance(x, dict) else "",
-#             index=None,
-#             placeholder=t("Seleccione una Jugadora"),
-#         )
-        
-#     return jugadora_opt, tipo, turno
+        # Normalizar start y end si vienen como Timestamp
+        if hasattr(start, "to_pydatetime"):
+            start = start.date()
+        if hasattr(end, "to_pydatetime"):
+            end = end.date()
+
+        df_filtrado = df_filtrado[
+            (df_filtrado["fecha_sesion"] >= start)
+            & (df_filtrado["fecha_sesion"] <= end)
+        ]
+
+    # ===========================================================
+    # MODO: AUSENCIAS (usa fecha_inicio y fecha_fin)
+    # Detecta solapamiento de intervalos
+    # ===========================================================
+    elif modo == "ausencias" and start and end:
+
+        # Comprobar columnas esperadas
+        if not {"fecha_inicio", "fecha_fin"}.issubset(df_filtrado.columns):
+            return df_filtrado
+
+        # Normalizar tipos
+        if pd.api.types.is_datetime64_any_dtype(df_filtrado["fecha_inicio"]):
+            df_filtrado["fecha_inicio"] = df_filtrado["fecha_inicio"].dt.date
+        if pd.api.types.is_datetime64_any_dtype(df_filtrado["fecha_fin"]):
+            df_filtrado["fecha_fin"] = df_filtrado["fecha_fin"].dt.date
+
+        if hasattr(start, "to_pydatetime"):
+            start = start.date()
+        if hasattr(end, "to_pydatetime"):
+            end = end.date()
+
+        # Regla de solapamiento:
+        # inicio <= fin_filtro AND fin >= inicio_filtro
+        df_filtrado = df_filtrado[
+            (df_filtrado["fecha_inicio"] <= end)
+            & (df_filtrado["fecha_fin"] >= start)
+        ]
+
+    return df_filtrado
 
 def selection_header_registro(jug_df: pd.DataFrame, comp_df: pd.DataFrame, records_df: pd.DataFrame = None):
 
@@ -198,6 +249,12 @@ def selection_header_registro(jug_df: pd.DataFrame, comp_df: pd.DataFrame, recor
             horizontal=True,
             index=0
         )
+
+        # tipo = st.selectbox(
+        #     t("Tipo de registro"),
+        #     ["Check-in", "Check-out", t("Aunsente")],
+        #     index=0
+        # )
 
     # ======================
     # 2. Turno seleccionado

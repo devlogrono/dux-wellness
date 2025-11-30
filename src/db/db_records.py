@@ -6,6 +6,98 @@ import datetime
 from src.schema import MAP_POSICIONES
 from src.db.db_connection import get_connection
 
+def insert_absence(id_jugadora, fecha_inicio, fecha_fin, motivo_id, turno, observacion):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT INTO ausencias 
+                (id_jugadora, fecha_inicio, fecha_fin, motivo_id, turno, observacion, usuario)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (
+            id_jugadora,
+            fecha_inicio,
+            fecha_fin,
+            motivo_id,
+            turno,
+            observacion,
+            st.session_state["auth"]["username"]
+        ))
+
+        conn.commit()
+        return True
+
+    except Exception as e:
+        st.error(f":material/warning: Error al registrar la ausencia: {e}")
+        return False
+
+    finally:
+        if cursor is not None:
+            cursor.close()
+        if conn is not None:
+            conn.close()
+
+def load_ausencias_activas_db(activas: bool = True):
+    """
+    Carga ausencias desde la BD.
+    
+    Parámetros:
+        activas (bool): 
+            - False → devuelve TODAS las ausencias.
+            - True  → devuelve solo ausencias activas HOY.
+    """
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        query = """
+            SELECT 
+                a.id,
+                a.id_jugadora,
+                f.nombre,
+                f.apellido,
+                f.competicion AS plantel,
+                a.fecha_inicio,
+                a.fecha_fin,
+                ta.nombre AS motivo_nombre,
+                a.turno,
+                a.observacion,
+                a.usuario
+            FROM ausencias a
+            LEFT JOIN futbolistas f 
+                ON a.id_jugadora = f.identificacion
+            LEFT JOIN tipo_ausencia ta
+                ON a.motivo_id = ta.id
+        """
+
+        # --- Si activas=True → añadir filtro de fecha ---
+        if activas:
+            query += """
+                WHERE CURDATE() BETWEEN a.fecha_inicio AND a.fecha_fin
+            """
+
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        return pd.DataFrame(rows)
+
+    except Exception as e:
+        st.error(f":material/error: Error cargando ausencias: {e}")
+        return pd.DataFrame()
+
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+
+
 def get_records_db(as_df: bool = True):
     """
     Carga todos los registros de la tabla 'wellness' desde la base de datos MySQL,
@@ -15,7 +107,7 @@ def get_records_db(as_df: bool = True):
     - as_df=False → devuelve lista de diccionarios
 
     Joins:
-    - wellness.id_tipo_estimulo → estimulos_campo.id
+    - wellness.id_tipo_carga → id_tipo_carga.id
     - wellness.id_tipo_readaptacion → estimulos_readaptacion.id
 
     Añade columnas procesadas:
@@ -46,8 +138,9 @@ def get_records_db(as_df: bool = True):
                 w.dolor,
                 w.partes_cuerpo_dolor,
                 w.periodizacion_tactica,
-                ec.nombre AS tipo_estimulo,
-                er.nombre AS tipo_readaptacion,
+                ec.nombre AS tipo_carga,
+                er.nombre AS rehabilitación_readaptación,
+                tc.nombre AS condicion,
                 w.minutos_sesion,
                 w.rpe,
                 w.ua,
@@ -57,10 +150,12 @@ def get_records_db(as_df: bool = True):
                 w.usuario
             FROM wellness AS w
             LEFT JOIN futbolistas f ON w.id_jugadora = f.identificacion
-            LEFT JOIN estimulos_campo AS ec 
-                ON w.id_tipo_estimulo = ec.id
+            LEFT JOIN tipo_carga AS ec 
+                ON w.id_tipo_carga = ec.id
             LEFT JOIN estimulos_readaptacion AS er 
                 ON w.id_tipo_readaptacion = er.id
+            LEFT JOIN tipo_condicion AS tc
+                ON w.id_condicion = tc.id
             WHERE f.genero = 'F' and w.estatus_id <= 2
             ORDER BY w.fecha_hora_registro DESC;
         """
@@ -289,7 +384,8 @@ def upsert_wellness_record_db(record: dict, modo: str = "checkin") -> bool:
                     SET 
                         tipo = %(tipo)s,
                         periodizacion_tactica = %(periodizacion_tactica)s,
-                        id_tipo_estimulo = %(id_tipo_estimulo)s,
+                        id_tipo_carga = %(id_tipo_carga)s,
+                        id_condicion = %(id_tipo_condicion)s,
                         id_tipo_readaptacion = %(id_tipo_readaptacion)s,
                         recuperacion = %(recuperacion)s,
                         fatiga = %(fatiga)s,
@@ -331,12 +427,12 @@ def upsert_wellness_record_db(record: dict, modo: str = "checkin") -> bool:
             insert_query = """
                 INSERT INTO wellness (
                     id_jugadora, fecha_sesion, tipo, turno, periodizacion_tactica,
-                    id_tipo_estimulo, id_tipo_readaptacion, recuperacion, fatiga, sueno,
+                    id_tipo_carga, id_tipo_readaptacion, recuperacion, fatiga, sueno,
                     stress, dolor, partes_cuerpo_dolor, minutos_sesion, rpe, ua,
                     en_periodo, observacion, usuario
                 ) VALUES (
                     %(id_jugadora)s, %(fecha_sesion)s, %(tipo)s, %(turno)s, %(periodizacion_tactica)s,
-                    %(id_tipo_estimulo)s, %(id_tipo_readaptacion)s, %(recuperacion)s, %(fatiga)s, %(sueno)s,
+                    %(id_tipo_carga)s, %(id_tipo_readaptacion)s, %(recuperacion)s, %(fatiga)s, %(sueno)s,
                     %(stress)s, %(dolor)s, %(partes_cuerpo_dolor)s, %(minutos_sesion)s, %(rpe)s, %(ua)s,
                     %(en_periodo)s, %(observacion)s, %(usuario)s
                 );
@@ -486,37 +582,6 @@ def load_competiciones_db() -> tuple[pd.DataFrame | None, str | None]:
     finally:
         conn.close()
 
-# def delete_wellness(ids: list[int]) -> tuple[bool, str]:
-#     """
-#     Elimina múltiples wellness desde la base de datos.
-
-#     Parámetros:
-#         ids (list[int]): lista de IDs de wellness a eliminar.
-
-#     Retorna:
-#         (bool, str): (éxito, mensaje)
-#     """
-#     if not ids:
-#         return False, "No se proporcionaron IDs de wellness."
-
-#     try:
-#         conn = get_connection()
-#         cursor = conn.cursor(dictionary=True)
-
-#         # Construir la query dinámica con placeholders
-#         query = f"DELETE FROM wellness WHERE id IN ({','.join(['%s'] * len(ids))})"
-#         cursor.execute(query, tuple(ids))
-#         conn.commit()
-
-#         cursor.close()
-#         conn.close()
-
-#         return True, f"✅ Se eliminaron {cursor.rowcount} registro(s) correctamente."
-
-#     except Exception as e:
-#         st.error(f":material/warning: Error al eliminar los registros: {e}")
-#         return False, f":material/warning: Error al eliminar los registros: {e}"
-
 def delete_wellness(ids: list[int]) -> tuple[bool, str]:
     """
     Soft-delete: marca registros de wellness como eliminados (estatus_id = 3).
@@ -563,3 +628,49 @@ def delete_wellness(ids: list[int]) -> tuple[bool, str]:
     except Exception as e:
         st.error(f":material/warning: Error al eliminar los registros: {e}")
         return False, f":material/warning: Error al eliminar los registros: {e}"
+
+def delete_absences(ids: list[int]) -> tuple[bool, str]:
+    """
+    Elimina registros de la tabla 'ausencias'.
+
+    Parámetros:
+        ids (list[int]): lista de IDs a eliminar.
+
+    Retorna:
+        (bool, str): (éxito, mensaje)
+    """
+
+    if not ids:
+        return False, "No se proporcionaron IDs de ausencias."
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Crear placeholders dinámicos
+        placeholders = ",".join(["%s"] * len(ids))
+
+        query = f"""
+            DELETE FROM ausencias
+            WHERE id IN ({placeholders})
+        """
+
+        cursor.execute(query, tuple(ids))
+        conn.commit()
+
+        afectados = cursor.rowcount
+
+        return True, f"Se eliminaron {afectados} registro(s) correctamente."
+
+    except Exception as e:
+        st.error(f":material/warning: Error al eliminar ausencias: {e}")
+        return False, f"Error al eliminar ausencias: {e}"
+
+    finally:
+        if cursor is not None:
+            cursor.close()
+        if conn is not None:
+            conn.close()

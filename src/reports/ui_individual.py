@@ -286,5 +286,3 @@ def graficos_individuales(df: pd.DataFrame):
         grafico_rpe_ua(df_player)
     with tabs[3]: 
         grafico_duracion_rpe(df_player)
-    #with tabs[4]: 
-    #    grafico_riesgo_lesion(df_player)

@@ -134,7 +134,7 @@ ruff check . --select F401 --fix
 - Configuración de remoto
 
 ```bash
-git remote add upstream https://github.com/lucbra21/DuxLesiones.git
+git remote add upstream https://github.com/lucbra21/CheckInOut.git
 git remote -v
 ```
 

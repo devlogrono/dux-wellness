@@ -9,6 +9,8 @@ from src.app_config.styles import WELLNESS_COLOR_NORMAL, WELLNESS_COLOR_INVERTID
 def checkin_form(record: dict, genero: str) -> tuple[dict, bool, str]:
     """Formulario de Check-in (Wellness pre-entrenamiento) con ICS y periodización táctica adaptativa."""
 
+    NA = "No Aplica"
+
     #st.session_state.clear()
     if "dia_plus" not in st.session_state:
         st.session_state["dia_plus"] = "MD+1"  # valor por defecto
@@ -20,13 +22,17 @@ def checkin_form(record: dict, genero: str) -> tuple[dict, bool, str]:
     map_zonas_anatomicas_nombre_a_id = dict(zip(zonas_anatomicas_df["nombre"], zonas_anatomicas_df["id"]))
     zonas_anatomicas_list = zonas_anatomicas_df["nombre"].tolist()
 
-    estimulos_campo_df = load_catalog_list_db("estimulos_campo", as_df=True)
-    map_estimulos_campo_nombre_a_id = dict(zip(estimulos_campo_df["nombre"], estimulos_campo_df["id"]))
-    estimulos_campo_list = estimulos_campo_df["nombre"].tolist()
+    tipo_carga_df = load_catalog_list_db("tipo_carga", as_df=True)
+    map_tipo_carga_nombre_a_id = dict(zip(tipo_carga_df["nombre"], tipo_carga_df["id"]))
+    tipo_carga_list = tipo_carga_df["nombre"].tolist()
 
     estimulos_readaptacion_df = load_catalog_list_db("estimulos_readaptacion", as_df=True)
     map_estimulos_readaptacion_nombre_a_id = dict(zip(estimulos_readaptacion_df["nombre"], estimulos_readaptacion_df["id"]))
     estimulos_readaptacion_list = estimulos_readaptacion_df["nombre"].tolist()
+
+    tipo_condicion_df = load_catalog_list_db("tipo_condicion", as_df=True)
+    map_tipo_condicion_nombre_a_id = dict(zip(tipo_condicion_df["nombre"], tipo_condicion_df["id"]))
+    tipo_condicion_list = tipo_condicion_df["nombre"].tolist()
 
     with st.container():
         st.markdown(t("**Check-in diario (pre-entrenamiento)**"))
@@ -69,7 +75,6 @@ def checkin_form(record: dict, genero: str) -> tuple[dict, bool, str]:
     # Días posteriores al partido (MD0 a MD+14)
     opciones_plus = ["MD0"] + [f"MD+{i}" for i in range(1, 15)]
 
-
     colA, colB, colC, colD, colE  = st.columns([1,1,1,2,2])
     with colA:
         fecha_sesion = datetime.date.today()
@@ -97,20 +102,28 @@ def checkin_form(record: dict, genero: str) -> tuple[dict, bool, str]:
 
         st.session_state["dia_minor"] = dia_minor
     with colD:
-        tipo_estimulo = st.selectbox(t("Tipos de estímulo"), estimulos_campo_list, index=0, key="select_tipo_estimulo")
-        tipo_estimulo_id = map_estimulos_campo_nombre_a_id.get(tipo_estimulo)
-        record["id_tipo_estimulo"] = tipo_estimulo_id
+        tipo_estimulo = st.selectbox(t("Tipos de carga"), tipo_carga_list, index=0, key="select_tipo_estimulo")
+        tipo_estimulo_id = map_tipo_carga_nombre_a_id.get(tipo_estimulo)
+        record["id_tipo_carga"] = tipo_estimulo_id
     with colE:
         disabled_selector = False
         if tipo_estimulo != "Readaptación":
-            #estimulos_readaptacion = ["NO APLICA"] 
-            estimulos_readaptacion_list = ["NO APLICA"]
+            estimulos_readaptacion_list = [NA]
             disabled_selector = True
 
-        tipo_readaptacion = st.selectbox(t("Readaptación en campo"), estimulos_readaptacion_list, index=0,
+        tipo_readaptacion = st.selectbox(t("Rehabilitación/readaptación"), estimulos_readaptacion_list, index=0,
         disabled=disabled_selector, key="select_tipo_readaptacion")
         tipo_readaptacion_id = map_estimulos_readaptacion_nombre_a_id.get(tipo_readaptacion)
         record["id_tipo_readaptacion"] = tipo_readaptacion_id
+
+    #-- Tipo de condición ---
+    colF, colG = st.columns([1.5,3])
+    with colF:
+        tipo_condicion = st.selectbox(t("Jugadora condicionada por:"), tipo_condicion_list, 
+                                      index=len(tipo_condicion_list) - 1, key="select_tipo_condicion")
+        tipo_condicion_id = map_tipo_condicion_nombre_a_id.get(tipo_condicion)
+        record["id_tipo_condicion"] = tipo_condicion_id
+        #st.caption(t("Selecciona la condición física actual de la jugadora"))
     
     periodizacion_tactica = dia_plus + " / " + dia_minor
     record["periodizacion_tactica"] = periodizacion_tactica

@@ -260,9 +260,10 @@ def tabla_wellness_individual(df: pd.DataFrame):
     #t_df["Día Semana"] = t_df["fecha_sesion"].dt.day_name(locale="es_ES")
     t_df["fecha_sesion"] = t_df["fecha_sesion"].dt.date
 
+    #st.dataframe(t_df)
     # Tipo de estímulo y readaptación
-    t_df["Tipo de estímulo"] = t_df.get("tipo_estimulo", "").fillna("").astype(str)
-    t_df["Tipo de readaptación"] = t_df.get("tipo_readaptacion", "").fillna("").astype(str)
+    t_df["Tipo de estímulo"] = t_df.get("tipo_carga", "").fillna("").astype(str)
+    t_df["Tipo de readaptación"] = t_df.get("rehabilitación_readaptación", "").fillna("").astype(str)
 
     # Calcular Promedio Wellness
     t_df["Promedio Wellness"] = t_df[["recuperacion", "energia", "sueno", "stress", "dolor"]].mean(axis=1)

@@ -1,4 +1,10 @@
 {
+  "Todos": "Tous",
+  "Registrar ausencia": "Enregistrer une absence",
+  "Selecciona un motivo de ausencia para continuar.": "Sélectionnez une raison d’absence pour continuer.",
+  "La fecha final no puede ser menor que la fecha inicial.": "La date de fin ne peut pas être antérieure à la date de début.",
+  "Rehabilitación/readaptación" : "Rehabilitation/Readaptation",
+  "Ausente": "Absent",
   "Inicio": "Accueil",
   "Registro": "Enregistrement",
   "Registros": "Enregistrements",
@@ -211,6 +217,7 @@
 
   "Tipo de registro": "Type d’enregistrement",
   "Tipos de estímulo": "Types de stimulus",
+  "Tipos de carga": "Types de charge",
   "Turno": "Tour",
 
   "UA (RPE x minutos)": "UA (RPE x minutes)",

@@ -1,4 +1,10 @@
-{
+{ 
+  "Todos": "All",
+  "Registrar ausencia": "Register absence",
+  "Selecciona un motivo de ausencia para continuar.": "Select a reason for absence to continue.",
+  "La fecha final no puede ser menor que la fecha inicial.": "The end date cannot be earlier than the start date.",
+  "Rehabilitación/readaptación" : "Rehabilitation/Readaptation",
+  "Ausente": "Absent",
   "Inicio": "Home",
   "Registro": "Record",
   "Registros": "Records",
@@ -137,6 +143,7 @@
   "Simulador de :red[Registros]": "Simulator of :red[Records]",
   "Tipo de registro": "Type of record",
   "Tipos de estímulo": "Types of stimulus",
+  "Tipos de carga": "Types of load",
   "Turno": "Shift",
   "UA (RPE x minutos)": "UA (RPE x minutes)",
   "UA total último día": "Total UA last day",

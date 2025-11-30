@@ -21,6 +21,7 @@ DIAS_SEMANA = {
 }
 
 OPCIONES_TURNO = {
+    "Todos": t("Todos"),
     "Turno 1": t("Turno 1"),
     "Turno 2": t("Turno 2"),
     "Turno 3": t("Turno 3")
@@ -40,7 +41,8 @@ def new_base_record(id_jugadora: str, username: str, tipo: str) -> dict:
         "turno": "",
         # Check-in fields
         "periodizacion_tactica": "",
-        "id_tipo_estimulo": "",
+        "id_tipo_carga": "",
+        "id_tipo_condicion": "",
         "id_tipo_readaptacion": "",
         "recuperacion": None,
         "fatiga": None,
