@@ -86,7 +86,7 @@ def checkin_form(record: dict, genero: str) -> tuple[dict, bool, str]:
         #opciones_plus = ["MD0", "MD+1", "MD+2", "MD+3", "MD+4", "MD+5", "MD+6", "MD+7"]
         dia_plus = st.selectbox(
             t("MD+"),
-            options=opciones_plus,
+            options=opciones_plus + ["VACACIONES + "],
             index=opciones_plus.index(st.session_state.get("dia_plus", 1)),
         )
 
@@ -96,7 +96,7 @@ def checkin_form(record: dict, genero: str) -> tuple[dict, bool, str]:
         #opciones_minor = ["MD-7", "MD-6", "MD-5", "MD-4", "MD-3", "MD-2", "MD-1", "MD0"]
         dia_minor = st.selectbox(
             "MD-",
-            options=opciones_minor,
+            options=opciones_minor  + ["VACACIONES - "],
             index=opciones_minor.index(st.session_state.get("dia_minor", 1)),
         )
 
