@@ -3,7 +3,7 @@ import streamlit as st
 from src.auth_system.auth_core import init_app_state, validate_login
 from src.auth_system.auth_ui import login_view, menu
 
-from src.db.db_records import get_records_db, load_jugadoras_db, load_ausencias_activas_db
+from src.db.db_records import get_records_db, load_jugadoras_db, load_ausencias_activas_db, load_competiciones_db
 from src.ui.absents_ui import filtrar_jugadoras_disponibles
 from src.util import clean_df, data_format
 from src.ui.ui_app import (
@@ -46,30 +46,36 @@ if df.empty:
 
 df = data_format(df)
 jug_df = load_jugadoras_db()
-jug_df = jug_df[jug_df["plantel"] == "1FF"]
+#jug_df = jug_df[jug_df["plantel"] == "1FF"]
+   
+comp_df = load_competiciones_db()
 ausencias_df = load_ausencias_activas_db()
 
 # ============================================================
 # INTERFAZ PRINCIPAL
 # ============================================================
 
-default_period = get_default_period(df)
+# --- Fila principal de filtros ---
+col1, col2, _ = st.columns([1.5, 1.5, 1])
 
-# Diccionario clave interna → texto traducido
-OPCIONES_PERIODO = {
-    "Hoy": t("Hoy"),
-    "Último día": t("Último día"),
-    "Semana": t("Semana"),
-    "Mes": t("Mes")
-}
+with col1:
+    default_period = get_default_period(df)
 
-periodo_traducido = st.radio(
-    t("Periodo:"),
-    list(OPCIONES_PERIODO.values()),horizontal=True,
-    index=list(OPCIONES_PERIODO.keys()).index(default_period))
+    # Diccionario clave interna → texto traducido
+    OPCIONES_PERIODO = {
+        "Hoy": t("Hoy"),
+        "Último día": t("Último día"),
+        "Semana": t("Semana"),
+        "Mes": t("Mes")
+    }
 
-periodo = next(k for k, v in OPCIONES_PERIODO.items() if v == periodo_traducido)
-df_periodo, articulo = filter_df_by_period(df, periodo)
+    periodo_traducido = st.radio(
+        t("Periodo:"),
+        list(OPCIONES_PERIODO.values()),horizontal=True,
+        index=list(OPCIONES_PERIODO.keys()).index(default_period))
+
+    periodo = next(k for k, v in OPCIONES_PERIODO.items() if v == periodo_traducido)
+    df_periodo, articulo = filter_df_by_period(df, periodo)
 
 # Cálculos principales
 wellness_prom, chart_wellness, delta_wellness = calc_metric_block(df_periodo, periodo, "wellness_score", "mean")
@@ -95,6 +101,26 @@ mostrar_resumen_tecnico(wellness_prom, rpe_prom, ua_total, alertas_count, total_
 
 st.divider()
 st.markdown(t("**Registros del periodo seleccionado**") + f"(:blue-background[{periodo_traducido}])")
+
+# --- Fila principal de filtros ---
+col1, col2, _ = st.columns([1.5, 1.5, 1])
+
+with col1:
+    competiciones_options = comp_df.to_dict("records")
+    competicion = st.selectbox(
+        t("Plantel"),
+        options=competiciones_options,
+        format_func=lambda x: f'{x["nombre"]} ({x["codigo"]})',
+        index=3,
+        key="aus_competicion",
+    )
+
+codigo_comp = competicion["codigo"]
+jug_df = jug_df[jug_df["plantel"] == codigo_comp]
+df_periodo = df_periodo[df_periodo["id_jugadora"].isin(jug_df["id_jugadora"])]
+
+#st.dataframe(jug_df, hide_index=True)
+      
 tabs = st.tabs([
         t(":material/physical_therapy: Indicadores de bienestar y carga"),
         t(":material/description: Registros detallados"),
@@ -111,9 +137,8 @@ with tabs[1]:
     st.dataframe(clean_df(df_periodo), hide_index=True)
 with tabs[2]:
 
-    jug_df_sin_ausencia = filtrar_jugadoras_disponibles(jug_df, ausencias_df)
-
-    pendientes_in, pendientes_out = get_pendientes_check(df_periodo, jug_df_sin_ausencia)
+    jugadoras_disponibles_df = filtrar_jugadoras_disponibles(jug_df, ausencias_df)
+    pendientes_in, pendientes_out = get_pendientes_check(df_periodo, jugadoras_disponibles_df)
 
     col1, col2 = st.columns(2)
     with col1:
