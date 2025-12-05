@@ -10,14 +10,17 @@ from src.db.db_records import (load_jugadoras_db, load_competiciones_db,
 from src.db.db_catalogs import load_catalog_list_db
 from src.ui.absents_ui import absents_form, filtrar_jugadoras_disponibles
 
-init_app_state()
-validate_login()
+#init_app_state()
+#validate_login()
 
 from src.ui.ui_components import selection_header_registro
 from src.ui.wellness_ui import wellness_form
 
 # Authentication gate
-if not st.session_state["auth"]["is_logged_in"]:
+init_app_state()
+is_valid = validate_login()
+
+if not is_valid or not st.session_state["auth"]["is_logged_in"]:
     login_view()
     st.stop()
 menu()

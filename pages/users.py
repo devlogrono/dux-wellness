@@ -12,17 +12,16 @@ import src.app_config.config as config
 
 config.init_config()
 init_app_state()
-validate_login()
+is_valid = validate_login()
 
 # Acceso solo para admin / developer
 if st.session_state["auth"]["rol"].lower() not in ["developer"]:
     st.switch_page("app.py")
 
 # Authentication gate
-if not st.session_state["auth"]["is_logged_in"]:
+if not is_valid or not st.session_state["auth"]["is_logged_in"]:
     login_view()
     st.stop()
-
 menu()
 
 # ============================

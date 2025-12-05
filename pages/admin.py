@@ -13,16 +13,15 @@ from src.db.db_records import (
     delete_wellness, load_jugadoras_db, load_competiciones_db, get_records_db, load_ausencias_activas_db)
 
 init_app_state()
-validate_login()
+is_valid = validate_login()
 
 if st.session_state["auth"]["rol"].lower() not in ["admin", "developer"]:
     st.switch_page("app.py")
     
 # Authentication gate
-if not st.session_state["auth"]["is_logged_in"]:
+if not is_valid or not st.session_state["auth"]["is_logged_in"]:
     login_view()
     st.stop()
-
 menu()
 
 st.header(t("Administrador de :red[registros]"), divider="red")
