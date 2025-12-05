@@ -27,10 +27,13 @@ def login_view() -> None:
             user_data = load_user_from_db(username)
             if not user_data:
                 st.error("Usuario no encontrado o inactivo.")
-                st.stop()
+                return
             validate_access(password, user_data)
 
 def menu():
+    if not st.session_state["auth"].get("is_logged_in", False):
+        return  # no mostrar menú si no hay sesión
+    
     with st.sidebar:
         st.logo("assets/images/banner.png", size="large")
         lang = language_selector()

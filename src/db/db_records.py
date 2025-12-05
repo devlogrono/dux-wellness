@@ -9,7 +9,7 @@ from src.db.db_connection import get_connection
 def insert_absence(id_jugadora, fecha_inicio, fecha_fin, motivo_id, turno, observacion):
     conn = None
     cursor = None
-
+    
     try:
         conn = get_connection()
         cursor = conn.cursor()

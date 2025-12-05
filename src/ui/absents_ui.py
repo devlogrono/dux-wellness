@@ -128,7 +128,7 @@ def absents_form(comp_df, jug_df, tipo_ausencia_df, ausencias_df):
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
             motivo_id=motivo_id,
-            turno=None if turno == "Todos" else turno,
+            turno=turno, #None if turno == "Todos" else 
             observacion=observacion
         )
 

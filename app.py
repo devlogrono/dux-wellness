@@ -26,9 +26,9 @@ config.init_config()
 # 🔐 AUTENTICACIÓN
 # ============================================================
 init_app_state()
-validate_login()
+is_valid = validate_login()
 
-if not st.session_state["auth"]["is_logged_in"]:
+if not is_valid or not st.session_state["auth"]["is_logged_in"]:
     login_view()
     st.stop()
 menu()
