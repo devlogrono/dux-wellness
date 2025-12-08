@@ -1,7 +1,7 @@
 import streamlit as st
 from src.db.db_login import load_user_from_db
 from src.auth_system.auth_core import logout, validate_access
-from src.util import centered_text
+from src.util import centered_text, right_caption
 from src.i18n.i18n import t, language_selector
 
 def login_view() -> None:
@@ -15,7 +15,7 @@ def login_view() -> None:
             </style>
         """, unsafe_allow_html=True)
 
-        centered_text("Wellness & RPE")
+        st.markdown("<br><br>", unsafe_allow_html=True)
         st.image("assets/images/banner.png")
 
         with st.form("login_form", clear_on_submit=False):
@@ -23,12 +23,15 @@ def login_view() -> None:
             password = st.text_input("Contraseña", type="password", value="")
             submitted = st.form_submit_button("Iniciar sesión", type="primary")
 
+        right_caption("Wellness & RPE")
+
         if submitted:
             user_data = load_user_from_db(username)
             if not user_data:
                 st.error("Usuario no encontrado o inactivo.")
                 return
             validate_access(password, user_data)
+        
 
 def menu():
     if not st.session_state["auth"].get("is_logged_in", False):

@@ -20,10 +20,10 @@ from src.ui.wellness_ui import wellness_form
 init_app_state()
 is_valid = validate_login()
 
-if not is_valid or not st.session_state["auth"]["is_logged_in"]:
-    login_view()
-    st.stop()
-menu()
+# if not is_valid or not st.session_state["auth"]["is_logged_in"]:
+#     login_view()
+#     st.stop()
+# menu()
 
 ##:red[:material/check_in_out:]
 st.header(t("Registro"), divider="red")

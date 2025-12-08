@@ -14,13 +14,13 @@ config.init_config()
 #validate_login()
 
 # Authentication gate
-init_app_state()
-is_valid = validate_login()
+# init_app_state()
+# is_valid = validate_login()
 
-if not is_valid or not st.session_state["auth"]["is_logged_in"]:
-    login_view()
-    st.stop()
-menu()
+# if not is_valid or not st.session_state["auth"]["is_logged_in"]:
+#     login_view()
+#     st.stop()
+# menu()
 
 #st.header('RPE / :red[Cargas]', divider=True)
 st.header(t("Análisis :red[individual]"), divider="red")

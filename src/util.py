@@ -30,12 +30,23 @@ def get_photo(url):
 def centered_text(text : str):
         st.markdown(f"<h3 style='text-align: center;'>{text}</span></h3>",unsafe_allow_html=True)
 
+def right_caption(text: str):
+    st.markdown(
+        f"""
+        <p style='text-align: right; font-size: 0.85rem; color: #666;'>
+            {text}
+        </p>
+        """,
+        unsafe_allow_html=True
+    )
+
 def data_format(df: pd.DataFrame):
     df = df[df["plantel"] == "1FF"]
     df["fecha_sesion"] = pd.to_datetime(df["fecha_sesion"], errors="coerce")
     df["fecha_dia"] = df["fecha_sesion"].dt.date
     df["semana"] = df["fecha_sesion"].dt.isocalendar().week
     df["mes"] = df["fecha_sesion"].dt.month
+    df = df.copy()
     df["fecha_sesion"] = pd.to_datetime(df["fecha_sesion"], errors="coerce").dt.date
     df["wellness_score"] = df[["recuperacion", "energia", "sueno", "stress", "dolor"]].sum(axis=1)
     return df 

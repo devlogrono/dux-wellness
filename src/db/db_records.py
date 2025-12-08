@@ -41,6 +41,7 @@ def insert_absence(id_jugadora, fecha_inicio, fecha_fin, motivo_id, turno, obser
         if conn is not None:
             conn.close()
 
+@st.cache_data(ttl=3600) 
 def load_ausencias_activas_db(activas: bool = True):
     """
     Carga ausencias desde la BD.
@@ -104,8 +105,7 @@ def load_ausencias_activas_db(activas: bool = True):
         if cursor: cursor.close()
         if conn: conn.close()
 
-
-
+@st.cache_data(ttl=3600) 
 def get_records_db(as_df: bool = True):
     """
     Carga todos los registros de la tabla 'wellness' desde la base de datos MySQL,
@@ -222,6 +222,7 @@ def get_records_db(as_df: bool = True):
     finally:
         conn.close()
 
+@st.cache_data(ttl=3600) 
 def get_record_for_player_day_turno_db(id_jugadora: str, fecha_sesion: str, turno: str):
     """
     Devuelve el primer registro existente en la BD 'wellness'

@@ -1,305 +1,239 @@
+# src/auth_system/auth_core.py
+
 import datetime
 import uuid
-
 import bcrypt
 import jwt
 import streamlit as st
-from st_cookies_manager import EncryptedCookieManager
 
-from src.auth_system import auth_config  # parámetros desde secrets.toml
+from src.auth_system import auth_config
+from src.auth_system.cookie_manager import cookie_set, cookie_get, cookie_delete
 
-# ============================================================
-# 🔐 GESTOR GLOBAL DE COOKIES (una instancia por app)
-# ============================================================
-cookies = EncryptedCookieManager(
-    password=auth_config.COOKIE_SECRET,   # clave de cifrado
-    prefix=auth_config.COOKIE_NAME        # nombre lógico de la app (estable)
-)
+# ======================================================
+# Helpers internos de estado
+# ======================================================
 
-if not cookies.ready():
-    # Sin cookies no podemos garantizar sesiones estables
-    st.stop()
-
-# ============================================================
-# 🧩 HELPERS
-# ============================================================
-def _ensure_str(x):
-    """Normaliza bytes / str a str."""
-    if isinstance(x, (bytes, bytearray)):
-        return x.decode("utf-8")
-    return str(x)
-
-
-def _auth_default_state() -> dict:
-    """Estructura base del estado de autenticación."""
+def _auth_default_state():
     return {
         "is_logged_in": False,
         "username": "",
         "rol": "",
         "nombre": "",
         "token": "",
-        "cookie_key": "",
         "session_id": "",
-        "issued_at": None,
-        "expires_at": None,
     }
 
 
-def ensure_session_defaults() -> None:
-    """Garantiza que exista st.session_state['auth'] y 'flash'."""
+def ensure_state():
     if "auth" not in st.session_state:
         st.session_state["auth"] = _auth_default_state()
-    if "flash" not in st.session_state:
-        st.session_state["flash"] = None
 
 
-def init_app_state() -> None:
-    """Inicializa el estado de la app (llamado al inicio en app.py)."""
-    ensure_session_defaults()
+def init_app_state():
+    ensure_state()
 
+# ======================================================
+# JWT
+# ======================================================
 
-# ============================================================
-# 🎫 JWT: CREACIÓN Y VALIDACIÓN
-# ============================================================
-def create_jwt_token(username: str, rol: str, session_id: str | None = None) -> str:
-    """
-    Crea un JWT por sesión, NO por usuario (usa session_id).
-    """
+def create_jwt(username, rol, session_id=None):
     if session_id is None:
         session_id = uuid.uuid4().hex
 
     now = datetime.datetime.utcnow()
-    exp_time = now + datetime.timedelta(seconds=auth_config.JWT_EXP_SECONDS)
+    exp = now + datetime.timedelta(seconds=auth_config.JWT_EXP_SECONDS)
 
     payload = {
         "user": username,
         "rol": rol,
-        "sid": session_id,                   # 🔑 identificador de sesión
+        "sid": session_id,
         "iat": int(now.timestamp()),
-        "exp": int(exp_time.timestamp()),
+        "exp": int(exp.timestamp()),
     }
 
-    token = jwt.encode(
-        payload,
-        auth_config.JWT_SECRET,
-        algorithm=auth_config.JWT_ALGORITHM,
-    )
-    return _ensure_str(token)
+    return jwt.encode(payload, auth_config.JWT_SECRET, algorithm=auth_config.JWT_ALGORITHM)
 
 
-def decode_jwt_token(token: str) -> dict | None:
-    """
-    Decodifica y valida un JWT.
-    Retorna el payload si es válido; None si está expirado o es inválido.
-    """
+def decode_jwt(token):
     try:
-        payload = jwt.decode(
-            token,
-            auth_config.JWT_SECRET,
-            algorithms=[auth_config.JWT_ALGORITHM],
-        )
-        return payload
+        return jwt.decode(token, auth_config.JWT_SECRET, algorithms=[auth_config.JWT_ALGORITHM])
     except jwt.ExpiredSignatureError:
-        # Sesión expirada
-        st.warning(":material/history_toggle_off: Tu sesión ha expirado. Vuelve a iniciar sesión.")
+        st.warning("Tu sesión ha expirado. Vuelve a iniciar sesión.")
         return None
-    except jwt.InvalidTokenError:
-        # Token manipulado o inválido
-        return None
-    except Exception as e:
-        st.error(f":material/error: Error al validar el token de sesión: {e}")
-        return None
-
-
-# ============================================================
-# 🧠 GESTIÓN DEL ESTADO DE AUTENTICACIÓN
-# ============================================================
-def _update_auth_state_from_payload(token: str, cookie_key: str, payload: dict) -> None:
-    """
-    Actualiza st.session_state['auth'] a partir del payload JWT.
-    """
-    ensure_session_defaults()
-    auth_state = st.session_state["auth"]
-
-    auth_state.update({
-        "is_logged_in": True,
-        "username": payload.get("user", ""),
-        "rol": (payload.get("rol") or "").lower(),
-        "token": token,
-        "cookie_key": cookie_key,
-        "session_id": payload.get("sid", ""),
-        "issued_at": payload.get("iat"),
-        "expires_at": payload.get("exp"),
-    })
-
-
-def set_auth_session(user: dict, token: str, cookie_key: str, payload: dict) -> None:
-    """
-    Configura la sesión de autenticación:
-    - actualiza st.session_state['auth']
-    - guarda la cookie de sesión
-    - marca la cookie activa para auto-login futuro
-    """
-    nombre_completo = f"{user.get('name', '')} {user.get('lastname', '')}".strip()
-
-    _update_auth_state_from_payload(token, cookie_key, payload)
-    st.session_state["auth"]["nombre"] = nombre_completo
-
-    # Guarda el token asociado a esta sesión concreta
-    cookies[cookie_key] = token
-
-    # Clave “maestra” para auto-login en nuevas pestañas de ESTE navegador
-    cookies["active_auth_key"] = cookie_key
-
-    cookies.save()
-
-
-# ============================================================
-# 🔍 OBTENER USUARIO ACTUAL DESDE SESIÓN / COOKIE
-# ============================================================
-def get_current_user() -> dict | None:
-    """
-    Devuelve el payload JWT del usuario actual si la sesión es válida.
-    Usa este orden de prioridad:
-      1) Token en st.session_state['auth'] (pestaña actual)
-      2) cookie_key en st.session_state['auth']
-      3) cookies['active_auth_key'] -> cookie de sesión activa en este navegador
-    Si algo falla, NO intenta “adivinar” usuario recorriendo todas las cookies.
-    """
-    ensure_session_defaults()
-    auth_state = st.session_state["auth"]
-
-    token = auth_state.get("token")
-    cookie_key = auth_state.get("cookie_key")
-
-    # 1) Si ya hay token en memoria, lo validamos
-    if token:
-        token = _ensure_str(token)
-        payload = decode_jwt_token(token)
-        if not payload:
-            logout()
-            return None
-        _update_auth_state_from_payload(token, cookie_key or "", payload)
-        return payload
-
-    # 2) Si tenemos cookie_key en el estado, usamos esa cookie
-    if not token and cookie_key:
-        stored = cookies.get(cookie_key)
-        if stored:
-            token = _ensure_str(stored)
-            payload = decode_jwt_token(token)
-            if not payload:
-                logout()
-                return None
-            _update_auth_state_from_payload(token, cookie_key, payload)
-            return payload
-
-    # 3) Auto-login suave: usar la “active_auth_key” si existe
-    active_key = cookies.get("active_auth_key")
-    if active_key:
-        cookie_key = _ensure_str(active_key)
-        stored = cookies.get(cookie_key)
-        if stored:
-            token = _ensure_str(stored)
-            payload = decode_jwt_token(token)
-            if not payload:
-                # Limpieza defensiva
-                try:
-                    cookies[cookie_key] = ""
-                    cookies["active_auth_key"] = ""
-                    cookies.save()
-                except Exception:
-                    pass
-                logout()
-                return None
-
-            _update_auth_state_from_payload(token, cookie_key, payload)
-            return payload
-
-    # Ninguna sesión válida encontrada
-    return None
-
-
-# ============================================================
-# 🚪 LOGOUT
-# ============================================================
-def logout() -> None:
-    """
-    Cierra la sesión ACTUAL:
-      - borra la cookie de esa sesión
-      - limpia st.session_state['auth']
-      - si coincide con active_auth_key, también la limpia
-    """
-    #del st.session_state["id_tipo_carga"]
-    #st.session_state.clear()
-    ensure_session_defaults()
-    auth_state = st.session_state["auth"]
-    cookie_key = auth_state.get("cookie_key")
-
-    try:
-        if cookie_key and cookie_key in cookies:
-            cookies[cookie_key] = ""   # borramos el valor cifrado
-        # Si esta sesión era la activa, limpimos la referencia
-        active_key = cookies.get("active_auth_key")
-        if active_key and _ensure_str(active_key) == cookie_key:
-            cookies["active_auth_key"] = ""
-        cookies.save()
     except Exception:
-        # No rompemos la app si hay un problema con las cookies
-        pass
-
-    st.session_state["auth"] = _auth_default_state()
-    st.rerun()
+        return None
 
 
-# ============================================================
-# ✅ VALIDACIÓN DE LOGIN (USADA DESDE app.py)
-# ============================================================
-def validate_login() -> bool:
+# ======================================================
+# BOOTSTRAP: Recuperar sesión desde cookie (doble ciclo)
+# ======================================================
+
+def bootstrap_auth_from_cookie():
     """
-    Revisa si hay una sesión válida.
-    No muestra mensajes; solo retorna True/False.
+    Proceso en 2 ciclos para restaurar sesión desde cookie
+    y manejar logout sin errores.
     """
-    payload = get_current_user()
-    return payload is not None
 
+    ensure_state()
 
-# ============================================================
-# 🔑 VALIDACIÓN DE ACCESO (LOGIN FORM) DESDE auth_ui.py
-# ============================================================
-def validate_access(password: str, user: dict) -> None:
-    """
-    Valida la contraseña y, si es correcta y tiene permisos,
-    crea una sesión nueva (JWT + cookie + session_state).
-    """
-    # 1) Comprobar contraseña
-    if not bcrypt.checkpw(password.encode("utf-8"), user["password_hash"].encode("utf-8")):
-        st.error("Usuario o contraseña incorrectos")
+    #st.text("Inicializando autenticación...")
+
+    # =====================================================
+    # (A) MANEJO DE LOGOUT EN 2 CICLOS - DEBE IR PRIMERO
+    # =====================================================
+    if st.session_state.get("_logout_pending"):
+
+        #st.text("Logout pendiente, verificando cookie...")
+
+        # Preguntar si la cookie sigue existiendo
+        token = cookie_get(auth_config.COOKIE_NAME)
+        #st.text(f"DEBUG logout → cookie_get devuelve: {token}")
+
+        # CICLO 1 después del logout: el iframe aún no procesó el delete
+        if token:
+            st.text("Cookie aún existe, esperando siguiente ciclo...")
+            st.stop()
+
+        # CICLO 2: cookie YA fue eliminada
+        #st.text("Cookie eliminada. Limpiando sesión...")
+
+        st.session_state["_logout_pending"] = False
+        st.session_state["auth"] = _auth_default_state()
+        st.session_state["_auth_bootstrap_done"] = True
+        st.session_state["_auth_cookie_checked"] = False
+
+        #st.text("Logout completado.")
         return
 
-    # 2) Validar permiso para esta APP
-    permisos = user.get("permissions", "")
-    permisos_list = [p.strip() for p in permisos.split(",")] if isinstance(permisos, str) else []
+    # =====================================================
+    # (B) FLUJO NORMAL DE BOOTSTRAP
+    # =====================================================
 
-    if auth_config.APP_NAME not in permisos_list:
-        st.error(":material/block: Acceso denegado. No tienes permiso para usar esta aplicación.")
+    # Si ya se ejecutó bootstrap, no repetir
+    if st.session_state.get("_auth_bootstrap_done"):
+        #st.text("Bootstrap ya completado previamente.")
+        return
+
+    # Pedimos la cookie (primer ciclo devuelve None)
+    cookie_token = cookie_get(auth_config.COOKIE_NAME)
+    #st.text(f"DEBUG cookie_token: {cookie_token}, name: {auth_config.COOKIE_NAME}")
+
+    # Primer ciclo: el componente aún no devolvió cookie
+    if not cookie_token and not st.session_state.get("_auth_cookie_checked"):
+        st.session_state["_auth_cookie_checked"] = True
+        #st.text("Primer ciclo: esperando cookie del componente...")
         st.stop()
 
-    # 3) Crear sesión independiente por login
-    #    cookie_key único por sesión → NO se mezclan sesiones entre pestañas/navegadores
-    cookie_key = f"auth_session_{uuid.uuid4().hex}"
+    # Segundo ciclo: ahora sí debería existir valor
+    if isinstance(cookie_token, str) and cookie_token.strip():
+        payload = decode_jwt(cookie_token)
+        if payload:
+            st.session_state["auth"].update({
+                "is_logged_in": True,
+                "username": payload["user"],
+                "rol": payload["rol"],
+                "token": cookie_token,
+                "session_id": payload["sid"],
+            })
+            #st.text("Sesión restaurada desde cookie")
 
-    # El session_id que irá dentro del token puede ser el mismo cookie_key
-    token = create_jwt_token(user["email"], user["role_name"], session_id=cookie_key)
-    token = _ensure_str(token)
+    # Marcamos que ya hicimos bootstrap
+    st.session_state["_auth_bootstrap_done"] = True
+    #st.text("Bootstrap completado.")
 
-    payload = decode_jwt_token(token)
+
+# ======================================================
+# get_current_user (YA SIN LEER COOKIES)
+# ======================================================
+
+def get_current_user():
+    """
+    SOLO usa session_state.
+    El bootstrap ya restauró la sesión desde cookie si era necesario.
+    """
+    ensure_state()
+
+    token = st.session_state["auth"].get("token")
+    if not token:
+        return None
+
+    payload = decode_jwt(token)
     if not payload:
-        st.error(":material/error: No se pudo crear la sesión. Inténtalo de nuevo.")
+        logout()
+        return None
+
+    return payload
+
+
+def validate_login():
+    return get_current_user() is not None
+
+
+# ======================================================
+# Logout real
+# ======================================================
+
+def logout():
+    ensure_state()
+
+    # 1) Marcar que hay un logout en curso
+    st.session_state["_logout_pending"] = True
+
+    # 2) Pedir al componente que borre la cookie en el navegador
+    cookie_delete(auth_config.COOKIE_NAME)
+
+    # 3) Resetear flags de bootstrap para que pueda re-ejecutarse
+    st.session_state["_auth_bootstrap_done"] = False
+    st.session_state["_auth_cookie_checked"] = False
+
+    # 4) Detener aquí este ciclo. El siguiente ciclo lo gestionará bootstrap_auth_from_cookie
+    st.stop()
+
+
+
+# ======================================================
+# Login desde auth_ui
+# ======================================================
+
+def validate_access(password, user):
+    """Valida contraseña, permisos y registra la sesión."""
+    if not bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
+        st.error("Credenciales incorrectas")
         return
 
-    # 4) Guardar sesión (state + cookie)
-    set_auth_session(user, token, cookie_key, payload)
+    permisos = [p.strip() for p in user.get("permissions", "").split(",")]
+    if auth_config.APP_NAME not in permisos:
+        st.error("No tienes permiso para acceder a esta app")
+        return
 
-    st.success(":material/check: Autenticado correctamente.")
-    st.rerun()
+    # Crear token
+    token = create_jwt(user["email"], user["role_name"])
+    payload = decode_jwt(token)
+
+    # Registrar sesión en memoria + cookie
+    st.session_state["auth"].update({
+        "is_logged_in": True,
+        "username": payload["user"],
+        "rol": payload["rol"],
+        "token": token,
+        "session_id": payload["sid"],
+        "nombre": f"{user.get('name','')} {user.get('lastname','')}".strip(),
+    })
+
+    # Guardar cookie real del navegador
+    cookie_set(auth_config.COOKIE_NAME, token, days=auth_config.COOKIE_EXP_DAYS)
+
+    # # SET
+    # st.write("### 1. SET COOKIE")
+    # cookie_set(auth_config.COOKIE_NAME, token, days=auth_config.COOKIE_EXP_DAYS)
+    # st.success("Cookie creada (MY_COOKIE=Jose123)")
+
+    # time.sleep(5)
+
+    # # GET
+    # st.write("### 2. GET COOKIE")
+    # #value = cookie_get(auth_config.COOKIE_NAME)
+    # #st.write("Valor leído:", value)
+
+    # st.success("Inicio de sesión exitoso")
+    # #st.rerun()

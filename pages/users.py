@@ -18,11 +18,11 @@ is_valid = validate_login()
 if st.session_state["auth"]["rol"].lower() not in ["developer"]:
     st.switch_page("app.py")
 
-# Authentication gate
-if not is_valid or not st.session_state["auth"]["is_logged_in"]:
-    login_view()
-    st.stop()
-menu()
+# # Authentication gate
+# if not is_valid or not st.session_state["auth"]["is_logged_in"]:
+#     login_view()
+#     st.stop()
+# menu()
 
 # ============================
 #   PASSWORD MANAGER PAGE

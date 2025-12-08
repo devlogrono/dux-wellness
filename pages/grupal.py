@@ -14,13 +14,13 @@ from src.reports.ui_grupal import group_dashboard
 from src.db.db_records import get_records_db, load_jugadoras_db, load_competiciones_db
 
 # Authentication gate
-init_app_state()
-is_valid = validate_login()
+# init_app_state()
+# is_valid = validate_login()
 
-if not is_valid or not st.session_state["auth"]["is_logged_in"]:
-    login_view()
-    st.stop()
-menu()
+# if not is_valid or not st.session_state["auth"]["is_logged_in"]:
+#     login_view()
+#     st.stop()
+# menu()
 
 #st.header('Riesgo de :red[lesión (proximidad)]', divider="red")
 st.header(t("Análisis :red[grupal]"), divider="red")

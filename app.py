@@ -1,6 +1,5 @@
 import streamlit as st
-
-from src.auth_system.auth_core import init_app_state, validate_login
+from src.auth_system.auth_core import bootstrap_auth_from_cookie, init_app_state, validate_login
 from src.auth_system.auth_ui import login_view, menu
 
 from src.db.db_records import get_records_db, load_jugadoras_db, load_ausencias_activas_db, load_competiciones_db
@@ -25,13 +24,13 @@ config.init_config()
 # ============================================================
 # 🔐 AUTENTICACIÓN
 # ============================================================
-init_app_state()
-is_valid = validate_login()
+# init_app_state()
+# is_valid = validate_login()
 
-if not is_valid or not st.session_state["auth"]["is_logged_in"]:
-    login_view()
-    st.stop()
-menu()
+# if not is_valid or not st.session_state["auth"]["is_logged_in"]:
+#     login_view()
+#     st.stop()
+# menu()
 
 st.header(t("Resumen de :red[Wellness] (1er Equipo)"), divider="red")
 
