@@ -41,15 +41,27 @@ def right_caption(text: str):
     )
 
 def data_format(df: pd.DataFrame):
-    df = df[df["plantel"] == "1FF"]
+    # 1. Filtrar garantizando copia
+    df = df[df["plantel"] == "1FF"].copy()
+
+    # 2. Conversión segura a datetime
     df["fecha_sesion"] = pd.to_datetime(df["fecha_sesion"], errors="coerce")
+
+    # 3. Nuevas columnas derivadas
     df["fecha_dia"] = df["fecha_sesion"].dt.date
     df["semana"] = df["fecha_sesion"].dt.isocalendar().week
     df["mes"] = df["fecha_sesion"].dt.month
-    df = df.copy()
-    df["fecha_sesion"] = pd.to_datetime(df["fecha_sesion"], errors="coerce").dt.date
-    df["wellness_score"] = df[["recuperacion", "energia", "sueno", "stress", "dolor"]].sum(axis=1)
-    return df 
+
+    # 4. Volver a dejar fecha_sesion como date (sin warnings)
+    df["fecha_sesion"] = df["fecha_sesion"].dt.date
+
+    # 5. Wellness score
+    df["wellness_score"] = (
+        df[["recuperacion", "energia", "sueno", "stress", "dolor"]]
+        .sum(axis=1)
+    )
+
+    return df
 
 def clean_df(records):
     columnas_excluir = [

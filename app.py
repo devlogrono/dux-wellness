@@ -1,6 +1,4 @@
 import streamlit as st
-from src.auth_system.auth_core import bootstrap_auth_from_cookie, init_app_state, validate_login
-from src.auth_system.auth_ui import login_view, menu
 
 from src.db.db_records import get_records_db, load_jugadoras_db, load_ausencias_activas_db, load_competiciones_db
 from src.ui.absents_ui import filtrar_jugadoras_ausentes

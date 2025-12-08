@@ -79,16 +79,13 @@ def selection_header(jug_df: pd.DataFrame, comp_df: pd.DataFrame, records_df: pd
 
             start, end = get_date_range_input(t("Rango de fechas"), start_default=start_default, end_default=end_default)
 
-            #default_rango = st.session_state.get("fecha_rango", (hace_15_dias, hoy))
-            #start, end = st.date_input( "Rango de fechas", value=(start_default, end_default), max_value=hoy )
-            #st.session_state["fecha_rango"] = (start, end)
-
     if modo == "registro":
         return jugadora_opt, tipo, turno
     
     # ==================================================
     # 🧮 FILTRADO DEL DATAFRAME
     # ==================================================
+    #st.text(t("Filtrando registros..."))
     df_filtrado = filtrar_registros(
         records_df,
         jugadora_opt=jugadora_opt,
@@ -156,7 +153,7 @@ def filtrar_registros(
     # -------------------------
     # MODO: reporte (rango de fechas)
     # -------------------------
-    elif modo == "reporte" and start and end:
+    elif (modo == "reporte" or modo == "reporte_grupal") and start and end:
 
         # Normalizar tipos de fecha
         if pd.api.types.is_datetime64_any_dtype(df_filtrado["fecha_sesion"]):
