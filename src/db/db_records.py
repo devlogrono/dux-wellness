@@ -6,42 +6,7 @@ import datetime
 from src.schema import MAP_POSICIONES
 from src.db.db_connection import get_connection
 
-def insert_absence(id_jugadora, fecha_inicio, fecha_fin, motivo_id, turno, observacion):
-    conn = None
-    cursor = None
-    
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-
-        cursor.execute("""
-            INSERT INTO ausencias 
-                (id_jugadora, fecha_inicio, fecha_fin, motivo_id, turno, observacion, usuario)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (
-            id_jugadora,
-            fecha_inicio,
-            fecha_fin,
-            motivo_id,
-            turno,
-            observacion,
-            st.session_state["auth"]["username"]
-        ))
-
-        conn.commit()
-        return True
-
-    except Exception as e:
-        st.error(f":material/warning: Error al registrar la ausencia: {e}")
-        return False
-
-    finally:
-        if cursor is not None:
-            cursor.close()
-        if conn is not None:
-            conn.close()
-
-@st.cache_data(ttl=3600) 
+#@st.cache_data(ttl=3600) 
 def load_ausencias_activas_db(activas: bool = True):
     """
     Carga ausencias desde la BD.
@@ -105,7 +70,7 @@ def load_ausencias_activas_db(activas: bool = True):
         if cursor: cursor.close()
         if conn: conn.close()
 
-@st.cache_data(ttl=3600) 
+#@st.cache_data(ttl=3600) 
 def get_records_db(as_df: bool = True):
     """
     Carga todos los registros de la tabla 'wellness' desde la base de datos MySQL,
@@ -222,7 +187,7 @@ def get_records_db(as_df: bool = True):
     finally:
         conn.close()
 
-@st.cache_data(ttl=3600) 
+#@st.cache_data(ttl=3600) 
 def get_record_for_player_day_turno_db(id_jugadora: str, fecha_sesion: str, turno: str):
     """
     Devuelve el primer registro existente en la BD 'wellness'
@@ -477,6 +442,134 @@ def upsert_wellness_record_db(record: dict, modo: str = "checkin") -> bool:
         if conn:
             conn.close()
 
+def delete_wellness(ids: list[int]) -> tuple[bool, str]:
+    """
+    Soft-delete: marca registros de wellness como eliminados (estatus_id = 3).
+    
+    Parámetros:
+        ids (list[int]): lista de IDs de wellness a eliminar.
+
+    Retorna:
+        (bool, str): (éxito, mensaje)
+    """
+    if not ids:
+        return False, "No se proporcionaron IDs de wellness."
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        # Datos de auditoría
+        deleted_by = st.session_state["auth"]["username"]
+        
+        # Construir query dinámica con placeholders
+        placeholders = ",".join(["%s"] * len(ids))
+        
+        query = f"""
+            UPDATE wellness
+            SET 
+                estatus_id = 3,
+                deleted_at = NOW(),
+                deleted_by = %s
+            WHERE id IN ({placeholders})
+        """
+
+        # Ejecutar query (primero deleted_by, luego ids)
+        cursor.execute(query, tuple([deleted_by] + ids))
+        conn.commit()
+
+        afectados = cursor.rowcount
+
+        cursor.close()
+        conn.close()
+
+        return True, f"Se eliminaron {afectados} registro(s) correctamente."
+
+    except Exception as e:
+        st.error(f":material/warning: Error al eliminar los registros: {e}")
+        return False, f":material/warning: Error al eliminar los registros: {e}"
+
+def insert_absence(id_jugadora, fecha_inicio, fecha_fin, motivo_id, turno, observacion):
+    conn = None
+    cursor = None
+    
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT INTO ausencias 
+                (id_jugadora, fecha_inicio, fecha_fin, motivo_id, turno, observacion, usuario)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (
+            id_jugadora,
+            fecha_inicio,
+            fecha_fin,
+            motivo_id,
+            turno,
+            observacion,
+            st.session_state["auth"]["username"]
+        ))
+
+        conn.commit()
+        return True
+
+    except Exception as e:
+        st.error(f":material/warning: Error al registrar la ausencia: {e}")
+        return False
+
+    finally:
+        if cursor is not None:
+            cursor.close()
+        if conn is not None:
+            conn.close()
+
+def delete_absences(ids: list[int]) -> tuple[bool, str]:
+    """
+    Elimina registros de la tabla 'ausencias'.
+
+    Parámetros:
+        ids (list[int]): lista de IDs a eliminar.
+
+    Retorna:
+        (bool, str): (éxito, mensaje)
+    """
+
+    if not ids:
+        return False, "No se proporcionaron IDs de ausencias."
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Crear placeholders dinámicos
+        placeholders = ",".join(["%s"] * len(ids))
+
+        query = f"""
+            DELETE FROM ausencias
+            WHERE id IN ({placeholders})
+        """
+
+        cursor.execute(query, tuple(ids))
+        conn.commit()
+
+        afectados = cursor.rowcount
+
+        return True, f"Se eliminaron {afectados} registro(s) correctamente."
+
+    except Exception as e:
+        st.error(f":material/warning: Error al eliminar ausencias: {e}")
+        return False, f"Error al eliminar ausencias: {e}"
+
+    finally:
+        if cursor is not None:
+            cursor.close()
+        if conn is not None:
+            conn.close()
+
 @st.cache_data(ttl=3600)  # cachea por 1 hora (ajústalo según tu frecuencia de actualización)
 def load_jugadoras_db() -> pd.DataFrame | None:
     """
@@ -592,96 +685,3 @@ def load_competiciones_db() -> tuple[pd.DataFrame | None, str | None]:
         st.stop()
     finally:
         conn.close()
-
-def delete_wellness(ids: list[int]) -> tuple[bool, str]:
-    """
-    Soft-delete: marca registros de wellness como eliminados (estatus_id = 3).
-    
-    Parámetros:
-        ids (list[int]): lista de IDs de wellness a eliminar.
-
-    Retorna:
-        (bool, str): (éxito, mensaje)
-    """
-    if not ids:
-        return False, "No se proporcionaron IDs de wellness."
-
-    try:
-        conn = get_connection()
-        cursor = conn.cursor(dictionary=True)
-
-        # Datos de auditoría
-        deleted_by = st.session_state["auth"]["username"]
-        
-        # Construir query dinámica con placeholders
-        placeholders = ",".join(["%s"] * len(ids))
-        
-        query = f"""
-            UPDATE wellness
-            SET 
-                estatus_id = 3,
-                deleted_at = NOW(),
-                deleted_by = %s
-            WHERE id IN ({placeholders})
-        """
-
-        # Ejecutar query (primero deleted_by, luego ids)
-        cursor.execute(query, tuple([deleted_by] + ids))
-        conn.commit()
-
-        afectados = cursor.rowcount
-
-        cursor.close()
-        conn.close()
-
-        return True, f"Se eliminaron {afectados} registro(s) correctamente."
-
-    except Exception as e:
-        st.error(f":material/warning: Error al eliminar los registros: {e}")
-        return False, f":material/warning: Error al eliminar los registros: {e}"
-
-def delete_absences(ids: list[int]) -> tuple[bool, str]:
-    """
-    Elimina registros de la tabla 'ausencias'.
-
-    Parámetros:
-        ids (list[int]): lista de IDs a eliminar.
-
-    Retorna:
-        (bool, str): (éxito, mensaje)
-    """
-
-    if not ids:
-        return False, "No se proporcionaron IDs de ausencias."
-
-    conn = None
-    cursor = None
-
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-
-        # Crear placeholders dinámicos
-        placeholders = ",".join(["%s"] * len(ids))
-
-        query = f"""
-            DELETE FROM ausencias
-            WHERE id IN ({placeholders})
-        """
-
-        cursor.execute(query, tuple(ids))
-        conn.commit()
-
-        afectados = cursor.rowcount
-
-        return True, f"Se eliminaron {afectados} registro(s) correctamente."
-
-    except Exception as e:
-        st.error(f":material/warning: Error al eliminar ausencias: {e}")
-        return False, f"Error al eliminar ausencias: {e}"
-
-    finally:
-        if cursor is not None:
-            cursor.close()
-        if conn is not None:
-            conn.close()
