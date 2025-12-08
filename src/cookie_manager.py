@@ -1,23 +1,17 @@
 import streamlit.components.v1 as components
 
-_cookie_component = components.declare_component(
-    "cookie_manager",
-    url="http://localhost:3001",  # usando modo development
-)
+from src.auth_system import auth_config
 
-# _cookie_component = components.declare_component(
-#     "cookie_manager",
-#     path="src/components/dist"
-# )
-
-# def cookie_set(name: str, value: str, days: int = 7):
-#     return _cookie_component(action="set", name=name, value=value, days=days)
-
-# def cookie_get(name: str):
-#     return _cookie_component(action="get", name=name)
-
-# def cookie_delete(name: str):
-#     return _cookie_component(action="delete", name=name)
+if auth_config.SERVER_ENV == "prod":
+    _cookie_component = components.declare_component(
+        "cookie_manager",
+        url=auth_config.COMPONENT_DOMAIN
+    )
+else:
+    _cookie_component = components.declare_component(
+        name="cookie_manager",
+        url="http://localhost:3001",  # usando modo development
+    )
 
 def cookie_set(name: str, value: str, days: int = 7, **kwargs):
     return _cookie_component(
