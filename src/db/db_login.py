@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 from src.db.db_connection import get_connection
 
-@st.cache_data(ttl=3600) 
+#@st.cache_data(ttl=3600) 
 def load_user_from_db(email: str):
     """
     Obtiene un usuario desde la base de datos según su email.
