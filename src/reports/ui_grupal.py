@@ -15,14 +15,14 @@ def group_dashboard(df_filtrado: pd.DataFrame):
 
     st.divider()
     tabs = st.tabs([
-        t(":material/table_chart: Resumen tabular"),
         t(":material/monitor_weight: Carga y esfuerzo"),
         t(":material/trending_up: Índices de control"),
+        t(":material/table_chart: Resumen tabular"),
     ])
 
     with tabs[0]:
-        tabla_resumen(df_filtrado)
-    with tabs[1]: 
         plot_carga_semanal(df_filtrado)
-    with tabs[2]: 
+    with tabs[1]: 
         plot_rpe_promedio(df_filtrado)
+    with tabs[2]: 
+        tabla_resumen(df_filtrado)
