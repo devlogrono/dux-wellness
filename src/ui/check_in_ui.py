@@ -2,7 +2,7 @@ import json
 import streamlit as st
 import datetime
 import pandas as pd
-from src.io_files import load_catalog_list
+from src.util.io_files import load_catalog_list
 from src.db.db_catalogs import load_catalog_list_db
 from src.schema import DIAS_SEMANA
 from src.i18n.i18n import t

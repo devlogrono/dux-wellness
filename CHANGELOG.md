@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [5.0.0] - 2025-12-08
 
+### Added
 - Manejo de cookies y sesiones
 - Zonas y Segmentos anatomicos para el registro del dolor
 - Conversion de indicadores de Wellness
@@ -16,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.0.0] - 2025-11-20
 
+### Added
 - Control de ausencias
 
 ## [3.0.0] - 2025-11-16

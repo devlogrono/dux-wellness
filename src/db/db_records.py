@@ -159,10 +159,6 @@ def get_records_db(as_df: bool = True):
         df = pd.DataFrame(rows)
 
         # --- Procesar JSON (partes_cuerpo_dolor) ---
-        # if "partes_cuerpo_dolor" in df.columns:
-        #     df["partes_cuerpo_dolor"] = df["partes_cuerpo_dolor"].apply(
-        #         lambda x: json.loads(x) if isinstance(x, str) and x.strip().startswith("[") else []
-        #     )
         if "zonas_anatomicas_dolor" in df.columns:
             # Convertir el JSON string a lista de IDs
             df["zonas_anatomicas_dolor"] = df["zonas_anatomicas_dolor"].apply(

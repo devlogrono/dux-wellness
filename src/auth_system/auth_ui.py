@@ -1,11 +1,14 @@
 import streamlit as st
 from src.db.db_login import load_user_from_db
 from src.auth_system.auth_core import logout, validate_access
-from src.util.util import centered_text, right_caption
+from src.util.util import right_caption, set_background_image_local
 from src.i18n.i18n import t, language_selector
 
 def login_view() -> None:
     """Renderiza el formulario de inicio de sesión."""
+
+    set_background_image_local("assets/images/fondo.jpg")
+
     _, col2, _ = st.columns([2, 1.5, 2])
     with col2:
         st.markdown("""
@@ -55,7 +58,7 @@ def menu():
             st.subheader(t("Administración :material/settings:"))
             st.page_link("pages/admin.py", label=t("Registros"), icon=":material/docs:")
         if st.session_state["auth"]["rol"].lower() in ["developer"]:
-            st.page_link("pages/users.py", label=t("Usuarios"), icon=":material/user_attributes:")
+            st.page_link("pages/developer.py", label=t("Usuarios"), icon=":material/user_attributes:")
 
         if st.button(t("Cerrar Sesión"), type="tertiary", icon=":material/logout:"):
             logout()

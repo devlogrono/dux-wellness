@@ -9,6 +9,8 @@ import unicodedata
 import datetime
 from dateutil.relativedelta import relativedelta  # pip install python-dateutil
 from datetime import date, timedelta
+import re
+import base64
 
 def normalize_text(s):
     """Limpia texto eliminando tildes, espacios invisibles y normalizando Unicode."""
@@ -212,7 +214,6 @@ def get_drive_direct_url(url: str) -> str:
         raise ValueError("La URL no parece ser de Google Drive")
 
     # Buscar el ID del archivo
-    import re
     match = re.search(r"/d/([a-zA-Z0-9_-]+)", url)
     if not match:
         raise ValueError("No se pudo extraer el ID del archivo de la URL")
@@ -327,3 +328,103 @@ def get_date_range_input(
         start, end = start_default, end_default
 
     return start, end
+
+def set_background_image(image_url: str, fixed: bool = False, overlay: float = 0.0):
+    """
+    Aplica una imagen de fondo a toda la app Streamlit.
+
+    Parámetros:
+        image_url (str): URL o ruta local de la imagen.
+        fixed (bool): Si True, el fondo queda fijo (efecto parallax).
+        overlay (float): Oscurecer fondo (0.0 = sin overlay, 0.0–1.0).
+    """
+
+    attachment = "fixed" if fixed else "scroll"
+
+    overlay_css = ""
+    if overlay > 0:
+        overlay_css = f"""
+        [data-testid="stAppViewContainer"]::before {{
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,{overlay});
+            z-index: 0;
+        }}
+        [data-testid="stAppViewContainer"] > * {{
+            position: relative;
+            z-index: 1;
+        }}
+        """
+
+    css = f"""
+    <style>
+    [data-testid="stAppViewContainer"] {{
+        background-image: url("{image_url}");
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-position: center center;
+        background-attachment: {attachment};
+    }}
+
+    [data-testid="stHeader"] {{
+        background: rgba(0,0,0,0);
+    }}
+
+    {overlay_css}
+    </style>
+    """
+
+    st.markdown(css, unsafe_allow_html=True)
+
+def set_background_image_local(image_path: str, fixed: bool = False, overlay: float = 0.0):
+    """
+    Aplica una imagen de fondo local a toda la app Streamlit usando Base64.
+    
+    Parámetros:
+        image_path (str): Ruta de la imagen local. Ej: "assets/images/banner.jpg"
+        fixed (bool): Si True, fondo con efecto parallax (fixed).
+        overlay (float): Oscurecer fondo (0.0 = sin overlay, 0.0–1.0 máximo).
+    """
+
+    # Convertir imagen local a Base64
+    with open(image_path, "rb") as img_file:
+        img_base64 = base64.b64encode(img_file.read()).decode()
+
+    attachment = "fixed" if fixed else "scroll"
+
+    overlay_css = ""
+    if overlay > 0:
+        overlay_css = f"""
+        [data-testid="stAppViewContainer"]::before {{
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,{overlay});
+            z-index: 0;
+        }}
+        [data-testid="stAppViewContainer"] > * {{
+            position: relative;
+            z-index: 1;
+        }}
+        """
+
+    css = f"""
+    <style>
+    [data-testid="stAppViewContainer"] {{
+        background-image: url("data:image/jpg;base64,{img_base64}");
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-position: center center;
+        background-attachment: {attachment};
+    }}
+
+    [data-testid="stHeader"] {{
+        background: rgba(0,0,0,0);
+    }}
+
+    {overlay_css}
+    </style>
+    """
+
+    st.markdown(css, unsafe_allow_html=True)
