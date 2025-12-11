@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [5.0.0] - 2025-12-08
 
 - Manejo de cookies y sesiones
-- Inversion de indicadores de Wellness
+- Zonas y Segmentos anatomicos para el registro del dolor
+- Conversion de indicadores de Wellness
     - recuperacion, energia y sueño de positivo a negativo
 
 ## [4.0.0] - 2025-11-20

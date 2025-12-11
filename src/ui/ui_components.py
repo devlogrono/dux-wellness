@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 import datetime
-from src.util import get_date_range_input
+from src.util.util import get_date_range_input
 from src.i18n.i18n import t
 from src.schema import OPCIONES_TURNO
 import json

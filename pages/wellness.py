@@ -3,15 +3,11 @@ from src.app_config import config
 config.init_config()
 
 from src.auth_system.auth_core import init_app_state, validate_login
-from src.auth_system.auth_ui import login_view, menu
 from src.i18n.i18n import t
 from src.db.db_records import (load_jugadoras_db, load_competiciones_db, 
                                get_records_db, load_ausencias_activas_db)
 from src.db.db_catalogs import load_catalog_list_db
 from src.ui.absents_ui import absents_form, filtrar_jugadoras_ausentes
-
-#init_app_state()
-#validate_login()
 
 from src.ui.ui_components import selection_header_registro
 from src.ui.wellness_ui import wellness_form
@@ -19,11 +15,6 @@ from src.ui.wellness_ui import wellness_form
 # Authentication gate
 init_app_state()
 is_valid = validate_login()
-
-# if not is_valid or not st.session_state["auth"]["is_logged_in"]:
-#     login_view()
-#     st.stop()
-# menu()
 
 ##:red[:material/check_in_out:]
 st.header(t("Registro"), divider="red")

@@ -17,8 +17,8 @@ def _auth_default_state():
     return {
         "is_logged_in": False,
         "username": "",
+        "name": "",
         "rol": "",
-        "nombre": "",
         "token": "",
         "session_id": "",
     }
@@ -36,7 +36,7 @@ def init_app_state():
 # JWT
 # ======================================================
 
-def create_jwt(username, rol, session_id=None):
+def create_jwt(name, username, rol, session_id=None):
     if session_id is None:
         session_id = uuid.uuid4().hex
 
@@ -45,6 +45,7 @@ def create_jwt(username, rol, session_id=None):
 
     payload = {
         "user": username,
+        "name": name,
         "rol": rol,
         "sid": session_id,
         "iat": int(now.timestamp()),
@@ -131,6 +132,7 @@ def bootstrap_auth_from_cookie():
             st.session_state["auth"].update({
                 "is_logged_in": True,
                 "username": payload["user"],
+                "name": payload.get("name", ""),
                 "rol": payload["rol"],
                 "token": cookie_token,
                 "session_id": payload["sid"],
@@ -206,34 +208,20 @@ def validate_access(password, user):
         st.error("No tienes permiso para acceder a esta app")
         return
 
+    name = f"{user.get('name','')}".strip() #{user.get('lastname','')}".strip()
     # Crear token
-    token = create_jwt(user["email"], user["role_name"])
+    token = create_jwt(name, user["email"], user["role_name"])
     payload = decode_jwt(token)
 
     # Registrar sesión en memoria + cookie
     st.session_state["auth"].update({
         "is_logged_in": True,
         "username": payload["user"],
+        "name": name,
         "rol": payload["rol"],
         "token": token,
-        "session_id": payload["sid"],
-        "nombre": f"{user.get('name','')} {user.get('lastname','')}".strip(),
+        "session_id": payload["sid"]
     })
 
     # Guardar cookie real del navegador
     cookie_set(auth_config.COOKIE_NAME, token, days=auth_config.COOKIE_EXP_DAYS)
-
-    # # SET
-    # st.write("### 1. SET COOKIE")
-    # cookie_set(auth_config.COOKIE_NAME, token, days=auth_config.COOKIE_EXP_DAYS)
-    # st.success("Cookie creada (MY_COOKIE=Jose123)")
-
-    # time.sleep(5)
-
-    # # GET
-    # st.write("### 2. GET COOKIE")
-    # #value = cookie_get(auth_config.COOKIE_NAME)
-    # #st.write("Valor leído:", value)
-
-    # st.success("Inicio de sesión exitoso")
-    # #st.rerun()

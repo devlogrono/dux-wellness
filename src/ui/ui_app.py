@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import date, timedelta
 
 from src.app_config.styles import WELLNESS_COLOR_NORMAL, WELLNESS_COLOR_INVERTIDO, get_color_wellness
-from src.util import ordenar_df
+from src.util.util import ordenar_df
 from src.i18n.i18n import t
 
 W_COLS = ["recuperacion", "energia", "sueno", "stress", "dolor"]

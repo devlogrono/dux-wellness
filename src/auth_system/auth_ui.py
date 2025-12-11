@@ -1,7 +1,7 @@
 import streamlit as st
 from src.db.db_login import load_user_from_db
 from src.auth_system.auth_core import logout, validate_access
-from src.util import centered_text, right_caption
+from src.util.util import centered_text, right_caption
 from src.i18n.i18n import t, language_selector
 
 def login_view() -> None:
@@ -42,7 +42,7 @@ def menu():
         lang = language_selector()
         #st.session_state["lang"] = lang
         st.subheader(f'Rol: {st.session_state["auth"]["rol"].capitalize()} :material/admin_panel_settings:')
-        st.write(f"{t('Hola')} **:blue-background[{st.session_state['auth']['username'].capitalize()}]** ")
+        st.write(f"{t('Hola')} **:blue-background[{st.session_state['auth']['name'].capitalize()}]** ")
 
         st.page_link("app.py", label=t("Inicio"), icon=":material/home:")
         st.subheader(t("Modo :material/dashboard:"))

@@ -7,7 +7,6 @@ import bcrypt
 
 from src.i18n.i18n import t
 from src.auth_system.auth_core import init_app_state, validate_login
-from src.auth_system.auth_ui import login_view, menu
 import src.app_config.config as config
 
 config.init_config()
@@ -17,12 +16,6 @@ is_valid = validate_login()
 # Acceso solo para admin / developer
 if st.session_state["auth"]["rol"].lower() not in ["developer"]:
     st.switch_page("app.py")
-
-# # Authentication gate
-# if not is_valid or not st.session_state["auth"]["is_logged_in"]:
-#     login_view()
-#     st.stop()
-# menu()
 
 # ============================
 #   PASSWORD MANAGER PAGE

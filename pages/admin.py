@@ -5,26 +5,14 @@ config.init_config()
 from src.db.db_catalogs import load_catalog_list_db
 from src.ui.ui_components import selection_header, filtrar_registros
 from src.i18n.i18n import t
-from src.auth_system.auth_core import init_app_state, validate_login
-from src.auth_system.auth_ui import login_view, menu
 from src.ui.absents_ui import absents_summary
 
 from src.db.db_records import (
     delete_wellness, load_jugadoras_db, load_competiciones_db, get_records_db, load_ausencias_activas_db)
 
-
 if st.session_state["auth"]["rol"].lower() not in ["admin", "developer"]:
     st.switch_page("app.py")
     
-# # Authentication gate
-# init_app_state()
-# is_valid = validate_login()
-
-# if not is_valid or not st.session_state["auth"]["is_logged_in"]:
-#     login_view()
-#     st.stop()
-# menu()
-
 st.header(t("Administrador de :red[registros]"), divider="red")
 
 # Load reference data

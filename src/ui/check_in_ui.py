@@ -7,6 +7,7 @@ from src.db.db_catalogs import load_catalog_list_db
 from src.schema import DIAS_SEMANA
 from src.i18n.i18n import t
 from src.app_config.styles import WELLNESS_COLOR_NORMAL, WELLNESS_COLOR_INVERTIDO
+from src.util.key_builder import KeyBuilder
 
 def validate_checkin(record: dict) -> tuple[bool, str]:
     # Required 1..5
@@ -28,7 +29,8 @@ def validate_checkin(record: dict) -> tuple[bool, str]:
 def checkin_inputs(record: dict, genero: str):
     NA = "No Aplica"
 
-    #st.session_state.clear()
+    kb = KeyBuilder()   # ← GENERADOR DE KEYS ÚNICO
+    
     if "dia_plus" not in st.session_state:
         st.session_state["dia_plus"] = "MD+1"  # valor por defecto
 
@@ -93,7 +95,7 @@ def checkin_inputs(record: dict, genero: str):
 
             with col1:
                 zona_cuerpo = st.selectbox(t("Zona anatómica *"), zonas_segmento_list, index=None,
-                                        placeholder=t("Selecciona una opción"), key=f"zona_cuerpo_") #{st.session_state['form_version']}
+                                        placeholder=t("Selecciona una opción"), key=kb.key("zona_cuerpo")) #{st.session_state['form_version']}
                 
             with col2:
                 if zona_cuerpo:
@@ -115,7 +117,7 @@ def checkin_inputs(record: dict, genero: str):
                     record["zonas_anatomicas_dolor"] = json.dumps(zonas_anatomicas_dolor_ids)
 
             with col3:
-                lateralidad = st.selectbox(t("Lateralidad"), lateralidades, index=0, key=f"lateralidad_") #{st.session_state['form_version']}
+                lateralidad = st.selectbox(t("Lateralidad"), lateralidades, index=0, key=kb.key("zona_cuerpo")) #{st.session_state['form_version']}
                 
                 if lateralidad:
                     record["lateralidad"] = lateralidad
@@ -131,9 +133,11 @@ def checkin_inputs(record: dict, genero: str):
 
     # Días previos al partido (MD-14 a MD0)
     opciones_minor = [f"MD-{i}" for i in range(14, 0, -1)] + ["MD0"]
+    opciones_minor += ["VACACIONES - "]
 
     # Días posteriores al partido (MD0 a MD+14)
     opciones_plus = ["MD0"] + [f"MD+{i}" for i in range(1, 15)]
+    opciones_plus += ["VACACIONES + "]
 
     colA, colB, colC, colD, colE  = st.columns([1,1,1,2,2])
     with colA:
@@ -146,8 +150,9 @@ def checkin_inputs(record: dict, genero: str):
         #opciones_plus = ["MD0", "MD+1", "MD+2", "MD+3", "MD+4", "MD+5", "MD+6", "MD+7"]
         dia_plus = st.selectbox(
             t("MD+"),
-            options=opciones_plus + ["VACACIONES + "],
+            options=opciones_plus,
             index=opciones_plus.index(st.session_state.get("dia_plus", 1)),
+            key=kb.key("select_dia_plus")
         )
 
         st.session_state["dia_plus"] = dia_plus 
@@ -156,8 +161,9 @@ def checkin_inputs(record: dict, genero: str):
         #opciones_minor = ["MD-7", "MD-6", "MD-5", "MD-4", "MD-3", "MD-2", "MD-1", "MD0"]
         dia_minor = st.selectbox(
             "MD-",
-            options=opciones_minor  + ["VACACIONES - "],
+            options=opciones_minor,
             index=opciones_minor.index(st.session_state.get("dia_minor", 1)),
+            key=kb.key("select_dia_minor")
         )
 
         st.session_state["dia_minor"] = dia_minor
@@ -177,7 +183,7 @@ def checkin_inputs(record: dict, genero: str):
             t("Tipos de carga"),
             tipo_carga_list,
             index=idx,
-            key="select_tipo_estimulo"
+            key=kb.key("select_tipo_estimulo")
         )
 
         # 4. Asignar ID real del valor seleccionado
@@ -195,7 +201,7 @@ def checkin_inputs(record: dict, genero: str):
             disabled_selector = True
 
         tipo_readaptacion = st.selectbox(t("Rehabilitación/readaptación"), estimulos_readaptacion_list, index=0,
-        disabled=disabled_selector, key="select_tipo_readaptacion")
+        disabled=disabled_selector, key=kb.key("select_tipo_readaptacion"))
         tipo_readaptacion_id = map_estimulos_readaptacion_nombre_a_id.get(tipo_readaptacion)
         record["id_tipo_readaptacion"] = tipo_readaptacion_id
 
@@ -203,7 +209,8 @@ def checkin_inputs(record: dict, genero: str):
     colF, colG = st.columns([1.5,3])
     with colF:
         tipo_condicion = st.selectbox(t("Jugadora condicionada por:"), tipo_condicion_list, 
-                                      index=len(tipo_condicion_list) - 1, key="select_tipo_condicion")
+                                      index=len(tipo_condicion_list) - 1, 
+                                      key=kb.key("select_tipo_condicion"))
         tipo_condicion_id = map_tipo_condicion_nombre_a_id.get(tipo_condicion)
         record["id_tipo_condicion"] = tipo_condicion_id
         #st.caption(t("Selecciona la condición física actual de la jugadora"))

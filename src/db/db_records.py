@@ -5,6 +5,7 @@ import datetime
 
 from src.schema import MAP_POSICIONES
 from src.db.db_connection import get_connection
+from src.db.db_catalogs import load_catalog_list_db
 
 #@st.cache_data(ttl=3600) 
 def load_ausencias_activas_db(activas: bool = True):
@@ -88,6 +89,9 @@ def get_records_db(as_df: bool = True):
     - fecha_sesion (datetime)
     """
 
+    zonas_anatomicas_df = load_catalog_list_db("zonas_anatomicas", as_df=True)
+    map_zonas_anatomicas_id_a_nombre = dict(zip(zonas_anatomicas_df["id"], zonas_anatomicas_df["nombre"]))
+
     conn = get_connection()
     if not conn:
         st.error(":material/warning: No se pudo establecer conexión con la base de datos.")
@@ -100,16 +104,21 @@ def get_records_db(as_df: bool = True):
                 w.id_jugadora,
                 f.nombre,
                 f.apellido,
-                f.competicion as plantel,
+                f.competicion AS plantel,
                 w.fecha_sesion,
                 w.tipo,
                 w.turno,
                 w.recuperacion,
-                w.fatiga as energia,
+                w.fatiga AS energia,
                 w.sueno,
                 w.stress,
                 w.dolor,
-                w.partes_cuerpo_dolor,
+
+                -- NUEVOS CAMPOS
+                zs.nombre AS zona_segmento,
+                w.zonas_anatomicas_dolor,
+                w.lateralidad_dolor,
+
                 w.periodizacion_tactica,
                 ec.nombre AS tipo_carga,
                 er.nombre AS rehabilitación_readaptación,
@@ -122,15 +131,20 @@ def get_records_db(as_df: bool = True):
                 w.fecha_hora_registro,
                 w.usuario
             FROM wellness AS w
-            LEFT JOIN futbolistas f ON w.id_jugadora = f.identificacion
-            LEFT JOIN tipo_carga AS ec 
+            LEFT JOIN futbolistas f 
+                ON w.id_jugadora = f.identificacion
+            LEFT JOIN tipo_carga ec 
                 ON w.id_tipo_carga = ec.id
-            LEFT JOIN estimulos_readaptacion AS er 
+            LEFT JOIN estimulos_readaptacion er 
                 ON w.id_tipo_readaptacion = er.id
-            LEFT JOIN tipo_condicion AS tc
+            LEFT JOIN tipo_condicion tc 
                 ON w.id_condicion = tc.id
-            WHERE f.genero = 'F' and w.estatus_id <= 2
+            LEFT JOIN zonas_segmento zs 
+                ON w.id_zona_segmento_dolor = zs.id
+            WHERE f.genero = 'F' 
+            AND w.estatus_id <= 2
             ORDER BY w.fecha_hora_registro DESC;
+
         """
 
         cursor = conn.cursor(dictionary=True)
@@ -145,11 +159,21 @@ def get_records_db(as_df: bool = True):
         df = pd.DataFrame(rows)
 
         # --- Procesar JSON (partes_cuerpo_dolor) ---
-        if "partes_cuerpo_dolor" in df.columns:
-            df["partes_cuerpo_dolor"] = df["partes_cuerpo_dolor"].apply(
+        # if "partes_cuerpo_dolor" in df.columns:
+        #     df["partes_cuerpo_dolor"] = df["partes_cuerpo_dolor"].apply(
+        #         lambda x: json.loads(x) if isinstance(x, str) and x.strip().startswith("[") else []
+        #     )
+        if "zonas_anatomicas_dolor" in df.columns:
+            # Convertir el JSON string a lista de IDs
+            df["zonas_anatomicas_dolor"] = df["zonas_anatomicas_dolor"].apply(
                 lambda x: json.loads(x) if isinstance(x, str) and x.strip().startswith("[") else []
             )
 
+            # Convertir cada ID → nombre
+            df["zonas_anatomicas_dolor"] = df["zonas_anatomicas_dolor"].apply(
+                lambda ids: [map_zonas_anatomicas_id_a_nombre.get(i, f"ID {i}") for i in ids]
+            )
+        
         # --- Procesar fechas ---
         if "fecha_sesion" in df.columns:
             df["fecha_sesion"] = (
