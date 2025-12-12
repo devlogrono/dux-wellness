@@ -7,8 +7,7 @@ target = st.session_state.get("target_page", None)
 if target:
     # Mapear los valores permitidos
     page_map = {
-        "registro": "pages/registro.py",
-        "seguimiento": "pages/seguimiento.py"
+        "registro": "pages/wellness.py"
     }
 
     if target in page_map:

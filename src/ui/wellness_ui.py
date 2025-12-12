@@ -36,7 +36,7 @@ def wellness_form(jugadora, tipo, turno):
     # ---------------------------------------
     record = new_base_record(
         id_jugadora=str(jugadora["id_jugadora"]),
-        username=st.session_state["auth"]["username"],
+        username=st.session_state["auth"]["name"].lower(),
         tipo="checkin" if tipo == "Check-in" else "checkout",
     )
     record["turno"] = turno or ""
@@ -99,7 +99,9 @@ def wellness_form(jugadora, tipo, turno):
                 if success:
                     st.success(t(":material/done_all: Registro guardado/actualizado correctamente."))
                     time.sleep(4)
-                    st.rerun()
+                    #st.rerun()
+                    #st.session_state["target_page"] = "registro"
+                    #st.switch_page("pages/switch.py")
                 else:
                     st.error(t(":material/warning: Error al guardar el registro."))
 
