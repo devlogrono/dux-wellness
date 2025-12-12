@@ -92,7 +92,7 @@ def bootstrap_auth_from_cookie():
 
         # CICLO 1 después del logout: el iframe aún no procesó el delete
         if token:
-            st.text("Cookie aún existe, esperando siguiente ciclo...")
+            #st.text("Cookie aún existe, esperando siguiente ciclo...")
             st.stop()
 
         # CICLO 2: cookie YA fue eliminada

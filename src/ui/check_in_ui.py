@@ -117,7 +117,7 @@ def checkin_inputs(record: dict, genero: str):
                     record["zonas_anatomicas_dolor"] = json.dumps(zonas_anatomicas_dolor_ids)
 
             with col3:
-                lateralidad = st.selectbox(t("Lateralidad"), lateralidades, index=0, key=kb.key("zona_cuerpo")) #{st.session_state['form_version']}
+                lateralidad = st.selectbox(t("Lateralidad"), lateralidades, index=0, key=kb.key("lateralidad")) #{st.session_state['form_version']}
                 
                 if lateralidad:
                     record["lateralidad"] = lateralidad
