@@ -255,7 +255,7 @@ def selection_header_registro(jug_df: pd.DataFrame, comp_df: pd.DataFrame, recor
         jug_df_filtrado = jug_df[jug_df["plantel"] == codigo_comp].copy()
 
         if records_df is not None and not records_df.empty:
-
+            #st.dataframe(records_df, hide_index=True)
             # Convertir tipos a minúsculas
             records_df["tipo"] = records_df["tipo"].astype(str).str.lower()
             records_df["turno"] = records_df["turno"].astype(str).str.lower()

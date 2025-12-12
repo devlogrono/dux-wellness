@@ -312,7 +312,8 @@ def upsert_wellness_record_db(record: dict, modo: str = "checkin") -> bool:
         return False
 
     try:
-        usuario_actual = st.session_state["auth"]["username"]
+        usuario_actual = st.session_state["auth"]["name"]
+        #user_name = st.session_state["auth"]["name"]
         cursor = conn.cursor(dictionary=True)
 
         # ============================================================
@@ -327,20 +328,43 @@ def upsert_wellness_record_db(record: dict, modo: str = "checkin") -> bool:
         # ============================================================
         # 🔹 Verificar si ya existe el registro
         # ============================================================
-        check_query = """
-            SELECT id FROM wellness
-            WHERE id_jugadora = %s
-              AND fecha_sesion = %s
-              AND turno = %s
-              AND estatus_id <= 2
-            LIMIT 1;
-        """
+
+        if st.session_state["auth"]["rol"].lower() == "developer":
+
+            check_query = """
+                SELECT id FROM wellness
+                WHERE id_jugadora = %s
+                AND fecha_sesion = %s
+                AND turno = %s
+                AND estatus_id <= 2
+                AND usuario = %s
+                LIMIT 1;
+            """
+            params = (
+                record.get("id_jugadora"),
+                fecha_sesion,
+                record.get("turno"),
+                usuario_actual
+            )
+            debug_query = check_query % tuple(repr(p) for p in params)
+            st.text(f"QUERY DEBUG: {debug_query}")
+        else:
+            check_query = """
+                SELECT id FROM wellness
+                WHERE id_jugadora = %s
+                AND fecha_sesion = %s
+                AND turno = %s
+                AND estatus_id <= 2
+                AND usuario != %s
+                LIMIT 1;
+            """
         cursor.execute(
             check_query,
             (
                 record.get("id_jugadora"),
                 fecha_sesion,
                 record.get("turno"),
+                usuario_actual
             ),
         )
         existing = cursor.fetchone()
