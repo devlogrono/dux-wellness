@@ -1,3 +1,5 @@
+from bootstrap import *
+
 import streamlit as st
 
 from db.db_records import get_records_db, load_jugadoras_db, load_ausencias_activas_db, load_competiciones_db

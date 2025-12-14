@@ -1,4 +1,4 @@
-#from bootstrap import *
+from bootstrap import *
 
 import streamlit as st
 from app_config import config

@@ -1,3 +1,5 @@
+from bootstrap import *
+
 import streamlit as st
 import bcrypt
 

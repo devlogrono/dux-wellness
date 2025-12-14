@@ -1,3 +1,5 @@
+from bootstrap import *
+
 import streamlit as st
 import app_config.config as config
 config.init_config()
