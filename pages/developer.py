@@ -1,4 +1,3 @@
-from bootstrap import *
 
 import streamlit as st
 import bcrypt
@@ -7,9 +6,9 @@ import bcrypt
 #    INIT CONFIG & AUTH
 # ============================
 
-from i18n.i18n import t
-from auth_system.auth_core import init_app_state, validate_login
-import app_config.config as config
+from modules.i18n.i18n import t
+from modules.auth_system.auth_core import init_app_state, validate_login
+import modules.app_config.config as config
 
 config.init_config()
 init_app_state()

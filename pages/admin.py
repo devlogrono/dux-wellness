@@ -1,16 +1,15 @@
-from bootstrap import *
-
 import streamlit as st
-import app_config.config as config
+import modules.app_config.config as config
 config.init_config()
 
-from db.db_catalogs import load_catalog_list_db
-from ui.ui_components import selection_header, filtrar_registros
-from i18n.i18n import t
-from ui.absents_ui import absents_summary
-
-from db.db_records import (
-    delete_wellness, load_jugadoras_db, load_competiciones_db, get_records_db, load_ausencias_activas_db)
+from modules.db.db_absences import load_active_absences_db
+from modules.db.db_catalogs import load_catalog_list_db
+from modules.ui.ui_components import selection_header, filtrar_registros
+from modules.i18n.i18n import t
+from modules.ui.absents_ui import absents_summary
+from modules.db.db_competitions import load_competitions_db
+from modules.db.db_players import load_players_db
+from modules.db.db_records import delete_record, get_records_db
 
 if st.session_state["auth"]["rol"].lower() not in ["admin", "developer"]:
     st.switch_page("app.py")
@@ -18,11 +17,11 @@ if st.session_state["auth"]["rol"].lower() not in ["admin", "developer"]:
 st.header(t("Administrador de :red[registros]"), divider="red")
 
 # Load reference data
-jug_df = load_jugadoras_db()
-comp_df = load_competiciones_db()
+jug_df = load_players_db()
+comp_df = load_competitions_db()
 wellness_df = get_records_db()
 tipo_ausencia_df = load_catalog_list_db("tipo_ausencia", as_df=True)
-ausencias_df = load_ausencias_activas_db(activas=False)
+ausencias_df = load_active_absences_db(activas=False)
 
 records, jugadora, tipo, turno, start, end = selection_header(jug_df, comp_df, wellness_df, modo="reporte")
 
@@ -72,7 +71,7 @@ with tab1:
                 st.rerun()
         with col3:
             if st.button(t(":material/delete: Eliminar"), type="primary"):
-                exito, mensaje = delete_wellness(ids_seleccionados)
+                exito, mensaje = delete_record(ids_seleccionados)
 
                 if exito:
                     # Marcar para recarga
