@@ -3,7 +3,7 @@ import streamlit as st
 from modules.db.db_client import query
 from modules.schema import MAP_POSICIONES
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=360000)
 def load_players_db() -> pd.DataFrame | None:
     """
     Carga jugadoras desde la base de datos (futbolistas + informacion_futbolistas).
