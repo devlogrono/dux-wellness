@@ -45,11 +45,12 @@ with tab1:
     
     jugadora_final = resolver_jugadora_final(
         jugadora_header=jugadora,
-        jug_df_filtrado=jug_df_filtrado,        # filtrado actual
-        jug_df=jug_df                   # DF original final
+        jug_df_filtrado=jug_df_filtrado,
+        jug_df=jug_df,
+        tipo = tipo  
     )
 
-    wellness_form(jugadora_final, tipo, turno)
+    wellness_form(jugadora, tipo, turno)
     
 with tab2:
-    absents_form(comp_df, jug_df, tipo_ausencia_df, ausencias_df, wellness_df)
+     absents_form(comp_df, jug_df, tipo_ausencia_df, ausencias_df, wellness_df)

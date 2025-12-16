@@ -80,6 +80,7 @@ def wellness_form(jugadora, tipo, turno):
 
         if success:
             st.success(t("Registro guardado correctamente."))
+            time.sleep(2)  # Pequeña pausa para mejor UX
             st.session_state[redirect_key] = True
             st.session_state["submitted"] = True
         else:
@@ -104,19 +105,13 @@ def wellness_form(jugadora, tipo, turno):
         st.switch_page("pages/switch.py")
         #st.rerun()
 
-def resolver_jugadora_final(jugadora_header, jug_df_filtrado, jug_df):
-    """
-    Resuelve la jugadora final a usar en el formulario de wellness,
-    manteniendo consistencia entre reruns y evitando selección incorrecta
-    cuando la jugadora desaparece de la lista.
+def resolver_jugadora_final(jugadora_header, jug_df_filtrado, jug_df, tipo):
 
-    Lógica:
-    - new_id: jugadora seleccionada actualmente en el header
-    - prev_id: jugadora previamente bloqueada en session_state
-    - Si prev_id desaparece → reset + rerun
-    - Si prev_id existe y new_id cambia → cambio manual → actualizar
-    - Si prev_id no existe aún → asignar new_id
-    """
+    # Si no hay NINGUNA jugadora disponible → fin
+    if jug_df_filtrado.empty:
+        st.session_state["last_selected_player_id"] = None
+        st.error(f"No hay más jugadoras disponibles para registrar {tipo}")
+        st.stop()
 
     # ID actual entregado por el header
     new_id = str(jugadora_header["id_jugadora"]) if jugadora_header else None
@@ -133,6 +128,9 @@ def resolver_jugadora_final(jugadora_header, jug_df_filtrado, jug_df):
     if prev_id is None:
         if new_id is not None:
             st.session_state["last_selected_player_id"] = new_id
+        else:
+            # Si no había selección, tomamos la PRIMERA jugadora disponible
+            st.session_state["last_selected_player_id"] = current_ids[0]
 
     else:
         # ------------------------------
@@ -140,11 +138,12 @@ def resolver_jugadora_final(jugadora_header, jug_df_filtrado, jug_df):
         # ------------------------------
         if new_id != prev_id:
 
-            # Si la jugadora anterior ya no existe → reset + rerun
+            # Si la jugadora anterior ya no existe → reset a la primera disponible
             if prev_id not in current_ids:
-                st.session_state["last_selected_player_id"] = None
+                st.session_state["last_selected_player_id"] = current_ids[0]
                 st.warning("La jugadora seleccionada ya no se encontraba disponible.")
                 st.rerun()
+
             # Cambio manual → actualizar bloqueada
             st.session_state["last_selected_player_id"] = new_id
 
@@ -153,16 +152,18 @@ def resolver_jugadora_final(jugadora_header, jug_df_filtrado, jug_df):
     # ------------------------------
     locked_id = st.session_state.get("last_selected_player_id")
 
-    # Si por alguna razón está limpia
     if locked_id is None:
-        st.rerun()
+        st.error("Error interno: No se pudo resolver la jugadora seleccionada.")
+        st.stop()
 
     # Buscar jugadora final exacta
     jugadora_rows = jug_df[jug_df["id_jugadora"].astype(str) == locked_id]
 
     if jugadora_rows.empty:
         st.session_state["last_selected_player_id"] = None
-        st.rerun()
+        st.error("La jugadora seleccionada ya no se encuentra disponible.")
+        st.stop()
 
-    # Devolver jugadora final en dict
+    # Devolver jugadora final
     return jugadora_rows.iloc[0].to_dict()
+
