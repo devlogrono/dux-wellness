@@ -39,23 +39,23 @@ def wellness_form(jugadora, tipo, turno):
     # ---------------------------------------
     form_key = f"form_wellness_{session_id}"
 
-    with st.form(key=form_key, border=False):
+    #with st.form(key=form_key, border=False):
 
-        # ---- Check-in ----
-        if tipo == "Check-in":
-            record, is_valid, validation_msg = checkin_form(record, jugadora["genero"])
+    # ---- Check-in ----
+    if tipo == "Check-in":
+        record, is_valid, validation_msg = checkin_form(record, jugadora["genero"])
 
-        # ---- Check-out ----
-        else:
-            record, is_valid, validation_msg = checkout_form(record)
+    # ---- Check-out ----
+    else:
+        record, is_valid, validation_msg = checkout_form(record)
 
         # ---- Botón seguro ----
-        submitted = st.form_submit_button(t("Guardar"))
+        #submitted = st.form_submit_button(t("Guardar"))
 
     # ---------------------------------------
     # 5. Procesamiento del guardado
     # ---------------------------------------
-    if submitted:
+    if st.button(f":material/save: {t('Guardar')}", key="btn_reg_wellness", disabled=not is_valid):
         preview_record(record)
 
         # ---------------------------------------

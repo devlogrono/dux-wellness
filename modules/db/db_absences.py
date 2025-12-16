@@ -1,6 +1,6 @@
 import pandas as pd
 import streamlit as st
-from modules.db.db_client import query
+from modules.db.db_client import query, execute
 
 def load_active_absences_db(activas: bool = True):
     """

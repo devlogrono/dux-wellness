@@ -96,6 +96,8 @@ def checkin_inputs(record: dict, genero: str):
         record["id_zona_segmento_dolor"] = None
         record["zonas_anatomicas_dolor"] = None
         record["lateralidad"] = None
+        
+        #st.write(record.get("dolor", 0))
         if int(record.get("dolor", 0)) > 1:
 
             with col1:
