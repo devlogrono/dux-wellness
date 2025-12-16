@@ -56,15 +56,15 @@ def wellness_form(jugadora, tipo, turno):
     # 5. Procesamiento del guardado
     # ---------------------------------------
     if st.button(f":material/save: {t('Guardar')}", key="btn_reg_wellness", disabled=not is_valid):
-        preview_record(record)
+        #preview_record(record)
 
         # ---------------------------------------
         # 3. Revisar si ya existe Check-in hoy
         # ---------------------------------------
-        existing_today = search_existing_record(record)
-        if existing_today:
-            st.error(t("Existe un registro de check-in previo para esta jugadora, fecha y turno."))
-            st.stop()
+        # existing_today = search_existing_record(record)
+        # if existing_today:
+        #     st.error(t("Existe un registro de check-in previo para esta jugadora, fecha y turno."))
+        #     st.stop()
         
         # if not existing_today:
         #     st.error(t("No existe un registro de check-in previo para esta jugadora, fecha y turno."))
