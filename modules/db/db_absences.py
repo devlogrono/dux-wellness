@@ -62,7 +62,7 @@ def insert_absence(id_jugadora, fecha_inicio, fecha_fin, motivo_id, turno, obser
         motivo_id,
         turno,
         observacion,
-        st.session_state["auth"]["username"]
+        st.session_state["auth"]["name"].lower()
     )
 
     ok = execute(sql, params)
