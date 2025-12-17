@@ -125,33 +125,34 @@ def upsert_record_db(record: dict, modo: str = "checkin") -> bool:
             }
 
         else:
-            sql = """
-                UPDATE wellness
-                SET 
-                    tipo = %(tipo)s,
-                    periodizacion_tactica = %(periodizacion_tactica)s,
-                    id_tipo_carga = %(id_tipo_carga)s,
-                    id_tipo_readaptacion = %(id_tipo_readaptacion)s,
-                    id_condicion = %(id_tipo_condicion)s,
-                    recuperacion = %(recuperacion)s,
-                    fatiga = %(fatiga)s,
-                    sueno = %(sueno)s,
-                    stress = %(stress)s,
-                    dolor = %(dolor)s,
-                    id_zona_segmento_dolor = %(id_zona_segmento_dolor)s,
-                    zonas_anatomicas_dolor = CAST(%(zonas_anatomicas_dolor)s AS JSON),
-                    lateralidad_dolor = %(lateralidad)s,
-                    minutos_sesion = %(minutos_sesion)s,
-                    rpe = %(rpe)s,
-                    ua = %(ua)s,
-                    en_periodo = %(en_periodo)s,
-                    observacion = %(observacion)s,
-                    usuario = %(usuario)s,
-                    fecha_hora_registro = CURRENT_TIMESTAMP
-                WHERE id = %(id)s;
-            """
-            params = dict(record)
-            params["id"] = existing["id"]
+            st.rerun()
+        #     sql = """
+        #         UPDATE wellness
+        #         SET 
+        #             tipo = %(tipo)s,
+        #             periodizacion_tactica = %(periodizacion_tactica)s,
+        #             id_tipo_carga = %(id_tipo_carga)s,
+        #             id_tipo_readaptacion = %(id_tipo_readaptacion)s,
+        #             id_condicion = %(id_tipo_condicion)s,
+        #             recuperacion = %(recuperacion)s,
+        #             fatiga = %(fatiga)s,
+        #             sueno = %(sueno)s,
+        #             stress = %(stress)s,
+        #             dolor = %(dolor)s,
+        #             id_zona_segmento_dolor = %(id_zona_segmento_dolor)s,
+        #             zonas_anatomicas_dolor = CAST(%(zonas_anatomicas_dolor)s AS JSON),
+        #             lateralidad_dolor = %(lateralidad)s,
+        #             minutos_sesion = %(minutos_sesion)s,
+        #             rpe = %(rpe)s,
+        #             ua = %(ua)s,
+        #             en_periodo = %(en_periodo)s,
+        #             observacion = %(observacion)s,
+        #             usuario = %(usuario)s,
+        #             fecha_hora_registro = CURRENT_TIMESTAMP
+        #         WHERE id = %(id)s;
+        #     """
+        #     params = dict(record)
+        #     params["id"] = existing["id"]
 
         return execute(sql, params)
 
