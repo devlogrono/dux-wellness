@@ -5,6 +5,7 @@ from modules.app_config import config
 from modules.db.db_absences import load_active_absences_db
 from modules.db.db_competitions import load_competitions_db
 from modules.db.db_players import load_players_db
+from modules.util.records_util import resolver_jugadora_final
 config.init_config()
 
 from modules.auth_system.auth_core import init_app_state, validate_login
@@ -14,7 +15,7 @@ from modules.db.db_catalogs import load_catalog_list_db
 from modules.ui.absents_ui import absents_form, filtrar_jugadoras_ausentes
 
 from modules.ui.ui_components import selection_header_registro
-from modules.ui.wellness_ui import wellness_form, resolver_jugadora_final
+from modules.ui.wellness_ui import wellness_form
 
 # Authentication gate
 init_app_state()
@@ -37,20 +38,13 @@ tab1, tab2 = st.tabs([ "Wellness :material/check_in_out:", "Ausencias :material/
 
 with tab1:
     jugadora, tipo, turno, jug_df_filtrado = selection_header_registro(jug_df, comp_df, wellness_df)
-
+    
     if st.session_state.get("submitted"):
         #st.write("DEBUG → Rerun causado por SUBMIT. Saltando validación.")
         st.session_state["submitted"] = False
         wellness_form(jugadora, tipo, turno)
-    
-    jugadora_final = resolver_jugadora_final(
-        jugadora_header=jugadora,
-        jug_df_filtrado=jug_df_filtrado,
-        jug_df=jug_df,
-        tipo = tipo  
-    )
-
-    wellness_form(jugadora, tipo, turno)
+    else:
+        wellness_form(jugadora, tipo, turno)
     
 with tab2:
      absents_form(comp_df, jug_df, tipo_ausencia_df, ausencias_df, wellness_df)
