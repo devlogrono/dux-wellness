@@ -454,6 +454,7 @@ def selection_header_registro(jug_df: pd.DataFrame, comp_df: pd.DataFrame, recor
         elif locked_id in opciones_ids:
             default_id = locked_id
         else:
+            print("no hay nada valido")
             default_id = opciones_ids[0]  # fallback solo si no hay nada válido
 
         # sincroniza estado del widget antes de renderizar para evitar "vacío"
@@ -466,7 +467,7 @@ def selection_header_registro(jug_df: pd.DataFrame, comp_df: pd.DataFrame, recor
             t("Jugadora"),
             options=opciones_ids,
             format_func=lambda x: map_jugadoras[x]["nombre_jugadora"],
-            index=default_index,
+            index=None, #default_index,
             key=widget_key_jugadora
         )
 

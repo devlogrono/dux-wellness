@@ -93,6 +93,7 @@ def resolver_jugadora_final(jugadora_header, jug_df_filtrado, jug_df, tipo, ctx_
     if locked_id not in current_ids:
         locked_id = current_ids[0]
         st.session_state[state_key] = locked_id
+        print("no encontrada")
 
     # 4) Resolver jugadora final desde el DF completo
     rows = jug_df[jug_df["id_jugadora"].astype(str) == locked_id]
