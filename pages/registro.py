@@ -40,11 +40,9 @@ with tab1:
     jugadora, tipo, turno, jug_df_filtrado = selection_header_registro(jug_df, comp_df, wellness_df)
     
     if st.session_state.get("submitted"):
-        #st.write("DEBUG → Rerun causado por SUBMIT. Saltando validación.")
         st.session_state["submitted"] = False
-        wellness_form(jugadora, tipo, turno)
-    else:
-        wellness_form(jugadora, tipo, turno)
+ 
+    wellness_form(jugadora, tipo, turno)
     
 with tab2:
      absents_form(comp_df, jug_df, tipo_ausencia_df, ausencias_df, wellness_df)

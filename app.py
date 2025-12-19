@@ -22,7 +22,7 @@ from modules.i18n.i18n import t
 import modules.app_config.config as config
 config.init_config()
 
-st.header(t("Resumen de :red[Wellness] (1er Equipo)"), divider="red")
+st.header(t("Resumen de :red[Wellness] [1er Equipo]"), divider="red")
 #st.session_state.clear()
 # ============================================================
 # 📦 CARGA DE DATOS

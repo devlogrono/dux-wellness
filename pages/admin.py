@@ -23,6 +23,73 @@ wellness_df = get_records_db()
 tipo_ausencia_df = load_catalog_list_db("tipo_ausencia", as_df=True)
 ausencias_df = load_active_absences_db(activas=False)
 
+@st.dialog(t("Eliminar registros filtrados"), width="small")
+def dialog_eliminar_todos_filtrados(ids_todos):
+    st.error(
+        t("Esta acción eliminará TODOS los registros mostrados en la tabla.")
+    )
+
+    st.write(
+        t("Para confirmar, escriba la palabra") + " **eliminar**"
+    )
+
+    confirm_text = st.text_input(
+        t("Confirmación"),
+        placeholder="eliminar"
+    )
+
+    _, col2, col3 = st.columns([1.8, 1, 1])
+
+    with col2:
+        if st.button(t(":material/cancel: Cancelar")):
+            st.rerun()
+
+    with col3:
+        if confirm_text.strip().lower() == "eliminar":
+            if st.button(
+                t(":material/delete: Eliminar todos"),
+                type="primary"
+            ):
+                deleted_by = st.session_state["auth"]["name"].lower()
+                exito, mensaje = delete_record(ids_todos, deleted_by)
+
+                if exito:
+                    st.session_state["reload_flag"] = True
+                    st.session_state["admin_delete_all"] = True
+                else:
+                    st.session_state["save_error"] = mensaje
+
+                st.rerun()
+        else:
+            st.button(
+                t(":material/delete: Eliminar todos"),
+                disabled=True
+            )
+
+
+# ===============================
+# 🔸 Diálogo de confirmación
+# ===============================
+@st.dialog(t("Confirmar"), width="small")
+def dialog_eliminar():
+    st.warning(f"¿{t('Está seguro de eliminar')} {len(ids_seleccionados)} {t('elemento')}(s)?")
+
+    _, col2, col3 = st.columns([1.8, 1, 1])
+    with col2:
+        if st.button(t(":material/cancel: Cancelar")):
+            st.rerun()
+    with col3:
+        if st.button(t(":material/delete: Eliminar"), type="primary"):
+            deleted_by = st.session_state["auth"]["name"].lower()
+            exito, mensaje = delete_record(ids_seleccionados, deleted_by)
+
+            if exito:
+                # Marcar para recarga
+                st.session_state["reload_flag"] = True
+
+            st.rerun()
+
+
 records, jugadora, tipo, turno, start, end = selection_header(jug_df, comp_df, wellness_df, modo="reporte")
 
 if records.empty:
@@ -58,33 +125,13 @@ with tab1:
     csv_data = records.to_csv(index=False).encode("utf-8")
 
     exito, mensaje = False, ""
-    # ===============================
-    # 🔸 Diálogo de confirmación
-    # ===============================
-    @st.dialog(t("Confirmar"), width="small")
-    def dialog_eliminar():
-        st.warning(f"¿{t('Está seguro de eliminar')} {len(ids_seleccionados)} {t('elemento')}(s)?")
-
-        _, col2, col3 = st.columns([1.8, 1, 1])
-        with col2:
-            if st.button(t(":material/cancel: Cancelar")):
-                st.rerun()
-        with col3:
-            if st.button(t(":material/delete: Eliminar"), type="primary"):
-                deleted_by = st.session_state["auth"]["name"].lower()
-                exito, mensaje = delete_record(ids_seleccionados, deleted_by)
-
-                if exito:
-                    # Marcar para recarga
-                    st.session_state["reload_flag"] = True
-
-                st.rerun()
+    
 
     if st.session_state.get("reload_flag") and exito:     
         st.success(mensaje)
         st.session_state["reload_flag"] = False
 
-    col1, col2, col3, _, _ = st.columns([1.6, 1.8, 2, 1, 1])
+    col1, col2, col3, col4, _ = st.columns([1.6, 1.8, 2, 1, 1])
     with col1:
         # --- Botón principal para abrir el diálogo ---
         if st.button(t(":material/delete: Eliminar seleccionados"), disabled=len(ids_seleccionados) == 0):
@@ -105,6 +152,11 @@ with tab1:
                     label=t(":material/download: Descargar registros en JSON"),
                     data=json_bytes, file_name="registros_wellness.json", mime="application/json"
                 )
+        with col4:
+            if st.button(
+                t(":material/delete_forever: Eliminar Todos los registros"),
+                disabled=records.empty):
+                dialog_eliminar_todos_filtrados(records["id"].tolist())
 
 with tab2:
 

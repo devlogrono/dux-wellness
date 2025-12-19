@@ -454,7 +454,7 @@ def selection_header_registro(jug_df: pd.DataFrame, comp_df: pd.DataFrame, recor
         elif locked_id in opciones_ids:
             default_id = locked_id
         else:
-            print("no hay nada valido")
+            #print("no hay nada valido")
             default_id = opciones_ids[0]  # fallback solo si no hay nada válido
 
         # sincroniza estado del widget antes de renderizar para evitar "vacío"
