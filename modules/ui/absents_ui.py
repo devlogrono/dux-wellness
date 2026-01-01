@@ -8,14 +8,14 @@ from modules.i18n.i18n import t
 def get_checkins(records_df, fecha):
     """Devuelve array de id_jugadora con CHECK-IN en la fecha y turno indicados."""
     return records_df[
-        (records_df["tipo"] == "checkin") &
+        (records_df["tipo"].str.lower() == "checkin") &
         (records_df["fecha_sesion"] == fecha)
     ]["id_jugadora"].unique()
 
 def get_checkouts(records_df, fecha):
     """Devuelve array de id_jugadora con CHECK-OUT en la fecha y turno indicados."""
     return records_df[
-        (records_df["tipo"] == "checkout") &
+        (records_df["tipo"].str.lower() == "checkout") &
         (records_df["fecha_sesion"] == fecha)
     ]["id_jugadora"].unique()
 
@@ -47,7 +47,8 @@ def filtrar_jugadoras_disponibles(jug_df, ausencias_df, wellness_df):
     checkouts = get_checkouts(wellness_df, hoy)
 
     jugadoras_con_registro = set(checkins) | set(checkouts)   # unión de ambas
-
+    #st.text(f"Jugadoras con registro hoy: {hoy}")
+    #st.dataframe(jugadoras_con_registro)
     # Si no hay ausencias → retornar jugadoras sin registros
     if ausencias_df is None or ausencias_df.empty:
         # devolvemos solo las jugadoras que NO tienen ningún registro
@@ -79,7 +80,7 @@ def checkout_inputs(comp_df, jug_df, tipo_ausencia_df, ausencias_df, wellness_df
 
     # --- Fila principal de filtros ---
     col1, col2, col3 = st.columns([1.5, 1.5, 1])
-
+    #st.dataframe(jug_df)
     with col1:
         competiciones_options = comp_df.to_dict("records")
         competicion = st.selectbox(
@@ -97,7 +98,8 @@ def checkout_inputs(comp_df, jug_df, tipo_ausencia_df, ausencias_df, wellness_df
             codigo_comp = competicion["codigo"]
 
             jugadoras_disponibles_df = filtrar_jugadoras_disponibles(jug_df, ausencias_df, wellness_df)
-
+            
+            
             jug_df_filtrado = jugadoras_disponibles_df[jugadoras_disponibles_df["plantel"] == codigo_comp]
             jugadoras_options = jug_df_filtrado.to_dict("records")
 
