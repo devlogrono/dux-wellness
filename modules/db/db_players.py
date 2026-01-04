@@ -37,7 +37,8 @@ def load_players_db() -> pd.DataFrame | None:
         return pd.DataFrame()
 
     df = pd.DataFrame(rows)
-
+    #st.dataframe(df)
+    
     # Normalización
     df["nombre"] = df["nombre"].astype(str).str.strip().str.title()
     df["apellido"] = df["apellido"].astype(str).str.strip().str.title()
