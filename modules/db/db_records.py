@@ -84,7 +84,7 @@ def get_records_db(as_df: bool = True):
     df.insert(2, "nombre_jugadora", (df["nombre"] + " " + df["apellido"]).str.strip())
 
     df = df.drop(columns=["nombre", "apellido"], errors="ignore")
-
+    
     return df if as_df else df.to_dict("records")
       
 def upsert_record_db(record: dict, modo: str = "checkin") -> bool:
