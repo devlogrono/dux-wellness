@@ -33,6 +33,7 @@ def selection_header(jug_df: pd.DataFrame, comp_df: pd.DataFrame, records_df: pd
 
     # --- Selección de jugadora ---
     with col2:
+        #st.dataframe(jug_df, hide_index=True)
         jugadora_opt = None
         disabled_jugadores = True if modo == "reporte_grupal" else False
 
@@ -41,14 +42,14 @@ def selection_header(jug_df: pd.DataFrame, comp_df: pd.DataFrame, records_df: pd
             jug_df_filtrado = jug_df[jug_df["plantel"] == codigo_comp]
 
             # IDs estables (NO dicts)
-            jugadora_ids = jug_df_filtrado["id_jugadora"].astype(str).tolist()
+            jugadora_ids = jug_df_filtrado["nombre_jugadora"].astype(str).tolist()
 
             # Resolver índice según session_state
             if (
-                "jugadora_id" in st.session_state
-                and st.session_state["jugadora_id"] in jugadora_ids
+                "nombre_jugadora" in st.session_state
+                and st.session_state["nombre_jugadora"] in jugadora_ids
             ):
-                jugadora_index = jugadora_ids.index(st.session_state["jugadora_id"])
+                jugadora_index = jugadora_ids.index(st.session_state["nombre_jugadora"])
             else:
                 jugadora_index = None
 
@@ -64,11 +65,11 @@ def selection_header(jug_df: pd.DataFrame, comp_df: pd.DataFrame, records_df: pd
 
             # Persistir selección
             if jugadora_id:
-                st.session_state["jugadora_id"] = jugadora_id
+                st.session_state["nombre_jugadora"] = jugadora_id
 
                 # Recuperar objeto completo SOLO aquí
                 jugadora_opt = jug_df_filtrado[
-                    jug_df_filtrado["id_jugadora"].astype(str) == jugadora_id
+                    jug_df_filtrado["nombre_jugadora"].astype(str) == jugadora_id
                 ].iloc[0].to_dict()
 
             # Debug opcional
