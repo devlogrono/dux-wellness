@@ -90,90 +90,89 @@ def dialog_eliminar():
 
             st.rerun()
 
-selection_header(jug_df, comp_df, wellness_df, modo="reporte")
 
-# records, jugadora, tipo, turno, start, end = selection_header(jug_df, comp_df, wellness_df, modo="reporte")
+records, jugadora, tipo, turno, start, end = selection_header(jug_df, comp_df, wellness_df, modo="reporte")
 
-# if records.empty:
-#     st.error(t("No se encontraron registros"))
-#     st.stop()
+if records.empty:
+    st.error(t("No se encontraron registros"))
+    st.stop()
 
-# tab1, tab2 = st.tabs([ "Wellness :material/check_in_out:", "Ausencias :material/event_busy:"])
+tab1, tab2 = st.tabs([ "Wellness :material/check_in_out:", "Ausencias :material/event_busy:"])
 
-# with tab1:
+with tab1:
 
-#     disabled = records.columns.tolist()
+    disabled = records.columns.tolist()
 
-#     columna = t("seleccionar")
+    columna = t("seleccionar")
 
-#     # --- Agregar columna de selección si no existe ---
-#     if columna not in records.columns:
-#         records.insert(0, columna, False)
+    # --- Agregar columna de selección si no existe ---
+    if columna not in records.columns:
+        records.insert(0, columna, False)
 
-#     #records_vista = records.drop("id", axis=1)
+    #records_vista = records.drop("id", axis=1)
 
-#     df_edited = st.data_editor(records, 
-#             column_config={
-#                 columna: st.column_config.CheckboxColumn(columna, default=False)},   
-#             num_rows="fixed", hide_index=True, disabled=disabled)
+    df_edited = st.data_editor(records, 
+            column_config={
+                columna: st.column_config.CheckboxColumn(columna, default=False)},   
+            num_rows="fixed", hide_index=True, disabled=disabled)
 
-#     ids_seleccionados = df_edited.loc[df_edited[columna], "id"].tolist()
+    ids_seleccionados = df_edited.loc[df_edited[columna], "id"].tolist()
 
-#     if st.session_state["auth"]["rol"].lower() in ["developer"]:
-#         st.write(t("Registros seleccionados:"), ids_seleccionados)
+    if st.session_state["auth"]["rol"].lower() in ["developer"]:
+        st.write(t("Registros seleccionados:"), ids_seleccionados)
 
-#     #st.dataframe(records, hide_index=True)
-#     # save_if_modified(records, df_edited)
-#     csv_data = records.to_csv(index=False).encode("utf-8")
+    #st.dataframe(records, hide_index=True)
+    # save_if_modified(records, df_edited)
+    csv_data = records.to_csv(index=False).encode("utf-8")
 
-#     exito, mensaje = False, ""
+    exito, mensaje = False, ""
     
 
-#     if st.session_state.get("reload_flag") and exito:     
-#         st.success(mensaje)
-#         st.session_state["reload_flag"] = False
+    if st.session_state.get("reload_flag") and exito:     
+        st.success(mensaje)
+        st.session_state["reload_flag"] = False
 
-#     col1, col2, col3, col4, _ = st.columns([1.6, 1.8, 2, 1, 1])
-#     with col1:
-#         # --- Botón principal para abrir el diálogo ---
-#         if st.button(t(":material/delete: Eliminar seleccionados"), disabled=len(ids_seleccionados) == 0):
-#             dialog_eliminar()
-#     with col2:
-#         st.download_button(
-#                 label=t(":material/download: Descargar registros en CSV"),
-#                 data=csv_data, file_name="registros_wellness.csv", mime="text/csv")
+    col1, col2, col3, col4, _ = st.columns([1.6, 1.8, 2, 1, 1])
+    with col1:
+        # --- Botón principal para abrir el diálogo ---
+        if st.button(t(":material/delete: Eliminar seleccionados"), disabled=len(ids_seleccionados) == 0):
+            dialog_eliminar()
+    with col2:
+        st.download_button(
+                label=t(":material/download: Descargar registros en CSV"),
+                data=csv_data, file_name="registros_wellness.csv", mime="text/csv")
 
-#     if st.session_state["auth"]["rol"].lower() in ["developer"]:
-#         with col3:
-#                 # Convertir a JSON (texto legible, sin índices)
-#                 json_data = records.to_json(orient="records", force_ascii=False, indent=2)
-#                 json_bytes = json_data.encode("utf-8")
+    if st.session_state["auth"]["rol"].lower() in ["developer"]:
+        with col3:
+                # Convertir a JSON (texto legible, sin índices)
+                json_data = records.to_json(orient="records", force_ascii=False, indent=2)
+                json_bytes = json_data.encode("utf-8")
 
-#                 # Botón de descarga
-#                 st.download_button(
-#                     label=t(":material/download: Descargar registros en JSON"),
-#                     data=json_bytes, file_name="registros_wellness.json", mime="application/json"
-#                 )
-#         with col4:
-#             if st.button(
-#                 t(":material/delete_forever: Eliminar Todos los registros"),
-#                 disabled=records.empty):
-#                 dialog_eliminar_todos_filtrados(records["id"].tolist())
+                # Botón de descarga
+                st.download_button(
+                    label=t(":material/download: Descargar registros en JSON"),
+                    data=json_bytes, file_name="registros_wellness.json", mime="application/json"
+                )
+        with col4:
+            if st.button(
+                t(":material/delete_forever: Eliminar Todos los registros"),
+                disabled=records.empty):
+                dialog_eliminar_todos_filtrados(records["id"].tolist())
 
-# with tab2:
+with tab2:
 
-#     ausencias_df_filtrado = filtrar_registros(
-#         ausencias_df,
-#         jugadora_opt=jugadora,
-#         turno=turno,
-#         modo="ausencias",
-#         tipo=tipo,
-#         start=start,
-#         end=end,
-#     )
+    ausencias_df_filtrado = filtrar_registros(
+        ausencias_df,
+        jugadora_opt=jugadora,
+        turno=turno,
+        modo="ausencias",
+        tipo=tipo,
+        start=start,
+        end=end,
+    )
 
-#     if ausencias_df_filtrado.empty:
-#         st.error(t("No se encontraron registros"))
-#         st.stop()
+    if ausencias_df_filtrado.empty:
+        st.error(t("No se encontraron registros"))
+        st.stop()
         
-#     absents_summary(ausencias_df_filtrado)
+    absents_summary(ausencias_df_filtrado)

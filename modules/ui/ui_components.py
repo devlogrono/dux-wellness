@@ -78,81 +78,56 @@ def selection_header(jug_df: pd.DataFrame, comp_df: pd.DataFrame, records_df: pd
         else:
             st.warning(":material/warning: No hay jugadoras cargadas para esta competición.")
 
-    # --- Selección de jugadora ---
-    # with col2:
-    #     jugadora_opt = None
-    #     disabled_jugadores = True if modo == "reporte_grupal" else False
-    #     if not jug_df.empty:
-    #         codigo_comp = competicion["codigo"]
-    #         jug_df_filtrado = jug_df[jug_df["plantel"] == codigo_comp]
-    #         jugadoras_options = jug_df_filtrado.to_dict("records")
+    # --- Selección de turno ---
+    with col3:
+        turno_traducido = st.selectbox(
+            t("Turno"),
+            list(OPCIONES_TURNO.values()),
+            index=0
+        )
+        turno = next(k for k, v in OPCIONES_TURNO.items() if v == turno_traducido)
+        #st.session_state.get("turno_idx", 0)
+        #st.session_state["turno_idx"] = ["Turno 1", "Turno 2", "Turno 3"].index(turno)
 
-    #         jugadora_opt = st.selectbox(
-    #             t("Jugadora"),
-    #             options=jugadoras_options,
-    #             format_func=lambda x: x["nombre_jugadora"] if isinstance(x, dict) else "",
-    #             #index=None,
-    #             placeholder=t("Seleccione una Jugadora"),
-    #             disabled = disabled_jugadores,
-    #             #key=kb.key("jugadora_selector")
-    #         )
+    # --- Tipo o rango de fechas según modo ---
+    tipo, start, end = None, None, None
+    with col4:
+        if modo == "registro":
+            tipo = st.radio(
+                t("Tipo de registro"),
+                options=["Check-in", "Check-out"], horizontal=True,
+                index=0 
+            )
+            #if st.session_state.get("tipo") is None else ["Check-in", "Check-out"].index(st.session_state["tipo"])
+            #st.session_state["tipo"] = tipo
 
-    #         st.text(jugadora_opt)
+        else:  # modo == "reporte"
+            hoy = datetime.date.today()
+            hace_15_dias = hoy - datetime.timedelta(days=15)
 
-            #st.session_state["jugadora_opt"] = jugadora_opt["id_jugadora"] if jugadora_opt else None
-        # else:
-        #     st.warning(":material/warning: No hay jugadoras cargadas para esta competición.")
+            start_default = hace_15_dias 
+            end_default = hoy
 
-    # # --- Selección de turno ---
-    # with col3:
-    #     turno_traducido = st.selectbox(
-    #         t("Turno"),
-    #         list(OPCIONES_TURNO.values()),
-    #         index=0
-    #     )
-    #     turno = next(k for k, v in OPCIONES_TURNO.items() if v == turno_traducido)
-    #     #st.session_state.get("turno_idx", 0)
-    #     #st.session_state["turno_idx"] = ["Turno 1", "Turno 2", "Turno 3"].index(turno)
+            start, end = get_date_range_input(t("Rango de fechas"), start_default=start_default, end_default=end_default)
 
-    # # --- Tipo o rango de fechas según modo ---
-    # tipo, start, end = None, None, None
-    # with col4:
-    #     if modo == "registro":
-    #         tipo = st.radio(
-    #             t("Tipo de registro"),
-    #             options=["Check-in", "Check-out"], horizontal=True,
-    #             index=0 
-    #         )
-    #         #if st.session_state.get("tipo") is None else ["Check-in", "Check-out"].index(st.session_state["tipo"])
-    #         #st.session_state["tipo"] = tipo
-
-    #     else:  # modo == "reporte"
-    #         hoy = datetime.date.today()
-    #         hace_15_dias = hoy - datetime.timedelta(days=15)
-
-    #         start_default = hace_15_dias 
-    #         end_default = hoy
-
-    #         start, end = get_date_range_input(t("Rango de fechas"), start_default=start_default, end_default=end_default)
-
-    # if modo == "registro":
-    #     return jugadora_opt, tipo, turno
+    if modo == "registro":
+        return jugadora_opt, tipo, turno
     
-    # # ==================================================
-    # # 🧮 FILTRADO DEL DATAFRAME
-    # # ==================================================
-    # #st.text(t("Filtrando registros..."))
-    # df_filtrado = filtrar_registros(
-    #     records_df,
-    #     jugadora_opt=jugadora_opt,
-    #     turno=turno,
-    #     modo=modo,
-    #     tipo=tipo,   # solo si modo="registros"
-    #     start=start,
-    #     end=end,
-    # )
+    # ==================================================
+    # 🧮 FILTRADO DEL DATAFRAME
+    # ==================================================
+    #st.text(t("Filtrando registros..."))
+    df_filtrado = filtrar_registros(
+        records_df,
+        jugadora_opt=jugadora_opt,
+        turno=turno,
+        modo=modo,
+        tipo=tipo,   # solo si modo="registros"
+        start=start,
+        end=end,
+    )
 
-    # return df_filtrado, jugadora_opt, tipo, turno, start, end
+    return df_filtrado, jugadora_opt, tipo, turno, start, end
 
 def filtrar_registros(
     records_df: pd.DataFrame,
