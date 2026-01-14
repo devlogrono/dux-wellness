@@ -64,16 +64,16 @@ def player_block_dux(jugadora_seleccionada: dict, unavailable="N/A"):
     col1, col2, col3 = st.columns([1.6, 2, 2])
 
     with col1:
-        if pd.notna(url_drive) and url_drive and url_drive != "No Disponible":
-            direct_url = clean_image_url(url_drive)
-            #st.text(direct_url)
-            response = get_photo(direct_url)
-            if response and response.status_code == 200 and 'image' in response.headers.get("Content-Type", ""):
-                st.image(response.content, width=300)
-            else:
-                st.image(f"assets/images/{profile_image}.png", width=300)
-        else:
-            st.image(f"assets/images/{profile_image}.png", width=300)
+        # if pd.notna(url_drive) and url_drive and url_drive != "No Disponible":
+        #     direct_url = clean_image_url(url_drive)
+        #     #st.text(direct_url)
+        #     response = get_photo(direct_url)
+        #     if response and response.status_code == 200 and 'image' in response.headers.get("Content-Type", ""):
+        #         st.image(response.content, width=300)
+        #     else:
+        #         st.image(f"assets/images/{profile_image}.png", width=300)
+        # else:
+        st.image(f"assets/images/{profile_image}.png", width=300)
 
     with col2:
         #st.markdown(f"**:material/sports_soccer: Competición:** {competicion}")
