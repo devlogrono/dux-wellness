@@ -6,6 +6,11 @@ import plotly.graph_objects as go
 import altair as alt
 from modules.i18n.i18n import t
 from modules.app_config.styles import get_color_wellness
+import matplotlib.pyplot as plt
+import pandas as pd
+import plotly.graph_objects as go
+import pandas as pd
+
 
 # 1️⃣ RPE y UA -------------------------------------------------------
 def grafico_rpe_ua(df: pd.DataFrame):
@@ -315,3 +320,115 @@ def tabla_wellness_individual(df: pd.DataFrame):
     # --- Explicación ---
     st.caption(f"🟩 {caption_green}")
     st.caption(f"🟥 {caption_red}")
+
+# Lesiones ------------------------------------------------
+
+def grafico_wellness_pre_lesion(df_pre: pd.DataFrame):
+    """
+    Gráfico interactivo de wellness previo a la lesión.
+    Incluye línea vertical de lesión y tooltip con zona afectada.
+    """
+
+    if df_pre is None or df_pre.empty:
+        return None
+
+    df = df_pre.sort_values("fecha_sesion")
+
+    # Datos clave de la lesión (una sola por gráfico)
+    fecha_lesion = pd.to_datetime(df["fecha_lesion"].iloc[0])
+    zona = df["zona_especifica_id"].iloc[0]
+    lateralidad = df["lateralidad"].iloc[0]
+    id_lesion = df["id_lesion"].iloc[0]
+
+    fig = go.Figure()
+
+    # ----------------------------
+    # Líneas de wellness
+    # ----------------------------
+    wellness_vars = {
+        "Recuperación": "recuperacion",
+        "Energía": "energia",
+        "Sueño": "sueno",
+        "Estrés": "stress",
+        "Dolor": "dolor",
+    }
+
+    for label, col in wellness_vars.items():
+        fig.add_trace(
+            go.Scatter(
+                x=df["fecha_sesion"],
+                y=df[col],
+                mode="lines+markers",
+                name=label,
+                hovertemplate=(
+                    "<b>%{x|%d-%m-%Y}</b><br>"
+                    f"{label}: %{{y}}<extra></extra>"
+                )
+            )
+        )
+
+    # ----------------------------
+    # Línea vertical de lesión
+    # ----------------------------
+    fig.add_vline(
+        x=fecha_lesion,
+        line_width=3,
+        line_dash="dash",
+        line_color="red"
+    )
+
+    # ----------------------------
+    # Punto de lesión (marcador)
+    # ----------------------------
+    fig.add_trace(
+        go.Scatter(
+            x=[fecha_lesion],
+            y=[5.2],
+            mode="markers",
+            marker=dict(
+                size=16,
+                color="red",
+                symbol="x"
+            ),
+            name="Lesión",
+            hovertemplate=(
+                "<b>Lesión</b><br>"
+                f"ID: {id_lesion}<br>"
+                f"Zona: {zona}<br>"
+                f"Lateralidad: {lateralidad}<br>"
+                f"Fecha: {fecha_lesion.strftime('%d-%m-%Y')}"
+                "<extra></extra>"
+            )
+        )
+    )
+
+    # ----------------------------
+    # Layout
+    # ----------------------------
+    fig.update_layout(
+        title="Contexto de wellness previo a la lesión",
+        xaxis_title="Fecha",
+        yaxis_title="Escala Wellness (1–5)",
+        yaxis=dict(range=[1, 5.5]),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0
+        ),
+        margin=dict(t=80),
+        hovermode="x unified"
+    )
+
+    # ----------------------------
+    # Eje X: fechas claras
+    # ----------------------------
+    fig.update_xaxes(
+        tickformat="%d-%m",
+        dtick="D1",
+        tickangle=-45
+    )
+
+    #return fig
+    st.plotly_chart(fig, use_container_width=True)

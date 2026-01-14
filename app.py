@@ -28,7 +28,6 @@ st.header(t("Resumen de :red[Wellness] [1er Equipo]"), divider="red")
 # 📦 CARGA DE DATOS
 # ============================================================
 df = get_records_db()
-#st.dataframe(df)
 
 if df.empty:
     st.warning(t("No hay registros de Wellness o RPE disponibles."))

@@ -1,11 +1,14 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+
+from modules.db.db_lesiones import get_wellness_pre_lesion
 from .metrics import compute_rpe_metrics, RPEFilters
 from modules.util.util import (get_photo, clean_image_url, calcular_edad)
 from modules.i18n.i18n import t
 
 from .plots_individuales import (
+    grafico_wellness_pre_lesion,
     grafico_rpe_ua,
     grafico_duracion_rpe,
     grafico_acwr,
@@ -259,6 +262,7 @@ def calcular_semaforo_riesgo(df: pd.DataFrame) -> tuple[str, str, float, float]:
 
 def graficos_individuales(df: pd.DataFrame):
     """Gráficos individuales para análisis de carga, bienestar y riesgo."""
+
     if df is None or df.empty:
         st.info("No hay datos disponibles para graficar.")
         return
@@ -273,7 +277,7 @@ def graficos_individuales(df: pd.DataFrame):
         t("Fatiga y ACWR"),
         t("RPE y UA"),
         t("Duración vs RPE"),
-        t("Lesiones")
+        t("Wellness + Lesiones")
     ])
 
     with tabs[0]: 
@@ -286,3 +290,11 @@ def graficos_individuales(df: pd.DataFrame):
         grafico_rpe_ua(df_player)
     with tabs[3]: 
         grafico_duracion_rpe(df_player)
+    with tabs[4]: 
+        
+        pre_lesion = get_wellness_pre_lesion(id_jugadora='X2486103X', dias_previos=14, as_df=True)
+        if not pre_lesion.empty: 
+            grafico_wellness_pre_lesion(pre_lesion)
+            #st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No hay registros de wellness previos a la lesión.")
