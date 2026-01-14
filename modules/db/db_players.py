@@ -28,7 +28,7 @@ def load_players_db() -> pd.DataFrame | None:
         FROM futbolistas f
         LEFT JOIN informacion_futbolistas i 
             ON f.identificacion = i.identificacion
-        WHERE f.genero = 'F'
+        WHERE f.genero = 'F' AND f.id_estado = 1
         ORDER BY f.nombre ASC;
     """
 
@@ -43,7 +43,7 @@ def load_players_db() -> pd.DataFrame | None:
     df["nombre"] = df["nombre"].astype(str).str.strip().str.title()
     df["apellido"] = df["apellido"].astype(str).str.strip().str.title()
 
-    df["nombre_jugadora"] = (df["nombre"] + " " + df["apellido"]).str.strip()
+    df["nombre_jugadora"] = (df["nombre"] + " " + df["apellido"]).str.strip().str.upper()
 
     orden = [
         "id", "id_jugadora", "nombre_jugadora", "nombre", "apellido", "posicion", "plantel",
