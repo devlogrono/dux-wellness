@@ -49,7 +49,7 @@ def get_records_db(as_df: bool = True):
         LEFT JOIN estimulos_readaptacion er ON w.id_tipo_readaptacion = er.id
         LEFT JOIN tipo_condicion tc ON w.id_condicion = tc.id
         LEFT JOIN zonas_segmento zs ON w.id_zona_segmento_dolor = zs.id
-        WHERE f.genero = 'F' 
+        WHERE f.genero = 'F' AND f.id_estado = 1
         AND w.estatus_id <= 2
         ORDER BY w.fecha_hora_registro DESC;
     """
@@ -81,7 +81,7 @@ def get_records_db(as_df: bool = True):
         df = df[df["usuario"] != "developer"]
 
     # Columna nombre_jugadora
-    df.insert(2, "nombre_jugadora", (df["nombre"] + " " + df["apellido"]).str.strip())
+    df.insert(2, "nombre_jugadora", (df["nombre"] + " " + df["apellido"]).str.strip().str.upper())
 
     df = df.drop(columns=["nombre", "apellido"], errors="ignore")
     
