@@ -18,20 +18,21 @@ comp_df = load_competitions_db()
 df = get_records_db()
 
 df_filtrado, jugadora, tipo, turno, start, end = selection_header(jug_df, comp_df, df, modo="reporte")
+st.dataframe(jugadora)
+st.dataframe(df_filtrado)
+# if not jugadora:
+#     st.info(t("Selecciona una jugadora para continuar."))
+#     st.stop()
 
-if not jugadora:
-    st.info(t("Selecciona una jugadora para continuar."))
-    st.stop()
+#     #st.subheader("RPE / Cargas")
+# if df_filtrado is None or df_filtrado.empty:
+#     st.info(t("No hay registros aún (se requieren Check-out con UA calculado)."))
+#     st.stop()
 
-    #st.subheader("RPE / Cargas")
-if df_filtrado is None or df_filtrado.empty:
-    st.info(t("No hay registros aún (se requieren Check-out con UA calculado)."))
-    st.stop()
+# player_block_dux(jugadora)
+# metricas(df_filtrado, jugadora, turno, start, end)
 
-player_block_dux(jugadora)
-metricas(df_filtrado, jugadora, turno, start, end)
+# icon, desc, acwr, fatiga = calcular_semaforo_riesgo(df_filtrado)
 
-icon, desc, acwr, fatiga = calcular_semaforo_riesgo(df_filtrado)
-
-st.markdown(f"{t('**Riesgo actual:**')} {icon} {desc}")
-graficos_individuales(df_filtrado)
+# st.markdown(f"{t('**Riesgo actual:**')} {icon} {desc}")
+# graficos_individuales(df_filtrado)
