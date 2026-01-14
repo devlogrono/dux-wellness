@@ -12,7 +12,7 @@ def load_active_absences_db(activas: bool = True):
     base_sql = """
         SELECT 
             a.id,
-            a.id_jugadora as identificacion,
+            a.id_jugadora,
             UPPER(CONCAT(f.nombre, ' ', f.apellido)) AS nombre_jugadora,
             f.competicion AS plantel,
             a.fecha_inicio,
