@@ -73,6 +73,6 @@ with tabs[0]:
 
             st.info("💡 Copia este hash y úsalo en tu base de datos.")
 with tabs[1]:
-    if st.button("🔄 Reiniciar caché"):
+    if st.button("Reiniciar caché"):
         st.cache_data.clear()
         st.success("Caché limpiada correctamente")

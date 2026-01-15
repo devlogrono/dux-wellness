@@ -2,7 +2,7 @@ import streamlit as st
 import mysql.connector
 from mysql.connector import pooling
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def init_connection():
     """Inicializa un pool de conexiones MySQL usando st.secrets."""
     db_config = st.secrets["connections"]["mysql"]
