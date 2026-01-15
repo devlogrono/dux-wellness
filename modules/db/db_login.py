@@ -61,6 +61,6 @@ def _load_all_users():
     return pd.DataFrame(rows or [])
 
 # Esta SÍ se puede cachear sin problemas
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_all_users_from_db():
     return _load_all_users()

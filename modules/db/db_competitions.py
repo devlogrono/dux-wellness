@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 from modules.db.db_client import query
 
-@st.cache_data(ttl=36000)
+@st.cache_data(ttl=36000, show_spinner=False)
 def load_competitions_db():
     """
     Carga competiciones desde la base de datos (tabla 'plantel').

@@ -61,7 +61,8 @@ def selection_header(jug_df: pd.DataFrame, comp_df: pd.DataFrame, records_df: pd
             jugadora_nombre = st.selectbox(
                 t("Jugadora"),
                 options=jugadora_nombres,
-                index=jugadora_index,          # None → selector vacío
+                format_func=lambda x: f"{jugadora_nombres.index(x) + 1} - {x}",
+                index=None,          # None → selector vacío
                 placeholder=t("Seleccione una Jugadora"),
                 disabled=disabled_jugadores,
                 key="jugadora_selector"
@@ -370,10 +371,16 @@ def selection_header_registro(jug_df: pd.DataFrame, comp_df: pd.DataFrame, recor
         # index coherente (sin placeholder que produzca None)
         default_index = opciones_ids.index(default_id)
 
+        jugadora_labels = {
+            jug_id: f"{i + 1} - {map_jugadoras[jug_id]['nombre_jugadora']}"
+            for i, jug_id in enumerate(opciones_ids)
+        }
+
         jugadora_id = st.selectbox(
             t("Jugadora"),
             options=opciones_ids,
-            format_func=lambda x: map_jugadoras[x]["nombre_jugadora"],
+            #format_func=lambda x: map_jugadoras[x]["nombre_jugadora"],
+            format_func=lambda x: jugadora_labels[x],
             index=None, #default_index,
             key=widget_key_jugadora
         )
