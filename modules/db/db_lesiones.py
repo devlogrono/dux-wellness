@@ -1,6 +1,7 @@
 import pandas as pd
 import json
 
+import streamlit as st
 from modules.db.db_client import query
 from modules.db.db_catalogs import load_catalog_list_db
 
@@ -27,12 +28,24 @@ def get_wellness_pre_lesion(
     # Filtro opcional por jugadora
     # ----------------------------
     jugadora_filter = ""
-    params = {"dias": dias_previos}
+    rol = st.session_state["auth"]["rol"].lower()
+    params = {
+        "dias": dias_previos,
+        "usuario": rol,
+    }
 
     if id_jugadora:
         jugadora_filter = "AND l.id_jugadora = %(id_jugadora)s"
         params["id_jugadora"] = id_jugadora
 
+    # Si el rol es developer, ve todo
+    
+    usuario_filter = ""
+    if rol != "developer":
+        usuario_filter = """
+            AND l.usuario = %(usuario)s
+            AND w.usuario = %(usuario)s
+        """
     # ----------------------------
     # Query CORREGIDA
     # ----------------------------
@@ -77,7 +90,7 @@ def get_wellness_pre_lesion(
 
         WHERE l.deleted_at IS NULL
           AND l.estado_lesion IN ('ACTIVO', 'OBSERVACION')
-          {jugadora_filter}
+          {jugadora_filter} {usuario_filter}
 
         ORDER BY l.id_jugadora, l.fecha_lesion, w.fecha_sesion;
     """

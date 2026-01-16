@@ -297,4 +297,4 @@ def graficos_individuales(df: pd.DataFrame):
             grafico_wellness_pre_lesion(pre_lesion)
             #st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("No hay registros de wellness previos a la lesión.")
+            st.info("No hay registros de lesiones.")
