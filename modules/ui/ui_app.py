@@ -533,7 +533,7 @@ def generar_resumen_periodo(df: pd.DataFrame):
         .format(precision=2, na_rep="")
     )
 
-    st.dataframe(styled, hide_index=True)
+    st.dataframe(styled)
 
     # st.caption(
     #     ":material/info: **Criterio de riesgo en la tabla:** "

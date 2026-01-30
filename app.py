@@ -127,7 +127,8 @@ if df_periodo.empty:
 with tabs[0]: 
     generar_resumen_periodo(df_periodo)
 with tabs[1]: 
-    st.dataframe(clean_df(df_periodo), hide_index=True)
+
+    st.dataframe(clean_df(df_periodo))
 with tabs[2]:
 
     jugadoras_disponibles_df = filtrar_jugadoras_ausentes(jug_df, ausencias_df)
@@ -139,11 +140,11 @@ with tabs[2]:
         if pendientes_in.empty:
             st.success(t(":material/check_circle: Todas las jugadoras han realizado el check-in."))
         else:
-            st.dataframe(pendientes_in, hide_index=True)
+            st.dataframe(pendientes_in)
 
     with col2:
         st.markdown(t(":material/logout: **Sin Check-Out**"))
         if pendientes_out.empty:
             st.success(t(":material/check_circle: Todas las jugadoras han realizado el check-out."))
         else:
-            st.dataframe(pendientes_out, hide_index=True)
+            st.dataframe(pendientes_out)
