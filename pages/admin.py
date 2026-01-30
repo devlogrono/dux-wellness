@@ -116,6 +116,8 @@ with tab1:
                 columna: st.column_config.CheckboxColumn(columna, default=False)},   
             num_rows="fixed", hide_index=True, disabled=disabled)
 
+    st.caption(f"{len(records)} registros encontrados")
+    
     ids_seleccionados = df_edited.loc[df_edited[columna], "id"].tolist()
 
     if st.session_state["auth"]["rol"].lower() in ["developer"]:
