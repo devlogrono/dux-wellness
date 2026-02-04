@@ -71,6 +71,20 @@ def _month_range(end_day: date) -> tuple[date, date]:
     end = next_month_start - timedelta(days=1)
     return start, end
 
+def _chronic_load(daily: pd.DataFrame, end_day: date, days: int) -> float:
+    """
+    Calcula carga crónica como media de UA diarios
+    en una ventana de 'days' días naturales.
+    Solo promedia días con sesión registrada.
+    """
+    start = end_day - timedelta(days=days - 1)
+    window = daily[
+        (daily["fecha_sesion"] >= start) &
+        (daily["fecha_sesion"] <= end_day)
+    ]
+    return float(window["ua_total"].mean()) if not window.empty else 0.0
+
+
 def compute_rpe_metrics(df_raw: pd.DataFrame, flt: RPEFilters) -> dict:
     df = _prepare_checkout_df(df_raw)
     #st.dataframe(df)
@@ -86,9 +100,15 @@ def compute_rpe_metrics(df_raw: pd.DataFrame, flt: RPEFilters) -> dict:
         "carga_media_mes": None,
         "monotonia_semana": None,
         "fatiga_aguda": None,
-        "fatiga_cronica": None,
-        "adaptacion": None,
-        "acwr": None,
+        "fatiga_cronica_28d": None,
+        "fatiga_cronica_42d": None,
+        "fatiga_cronica_56d": None,
+        "adaptacion_28d": None,
+        "adaptacion_42d": None,
+        "adaptacion_56d": None,
+        "acwr_28d": None,
+        "acwr_42d": None,
+        "acwr_56d": None,
         "variabilidad_semana": None,
         "daily_table": pd.DataFrame(),
     }
@@ -138,16 +158,60 @@ def compute_rpe_metrics(df_raw: pd.DataFrame, flt: RPEFilters) -> dict:
     res["fatiga_aguda"] = float(fatiga_aguda)
 
     # Chronic = average daily load over last 28 days
-    last28_start = end_day - timedelta(days=27)
-    daily_last28 = daily[(daily["fecha_sesion"] >= last28_start) & (daily["fecha_sesion"] <= end_day)]
-    fatiga_cronica = daily_last28["ua_total"].mean() if not daily_last28.empty else 0.0
-    res["fatiga_cronica"] = float(fatiga_cronica)
-
+    #last28_start = end_day - timedelta(days=27)
+    #daily_last28 = daily[(daily["fecha_sesion"] >= last28_start) & (daily["fecha_sesion"] <= end_day)]
+    #fatiga_cronica = daily_last28["ua_total"].mean() if not daily_last28.empty else 0.0
+    #res["fatiga_cronica"] = float(fatiga_cronica)
+    
     # Adaptation index (example): chronic - acute/7 (normalize acute per day)
-    res["adaptacion"] = float(fatiga_cronica - (fatiga_aguda / 7.0))
+    # res["adaptacion"] = float(fatiga_cronica - (fatiga_aguda / 7.0))
 
-    # ACWR (acute:chronic) using mean-per-day normalization
-    # Avoid divide-by-zero
-    res["acwr"] = float((fatiga_aguda / 7.0) / fatiga_cronica) if fatiga_cronica else None
+    # # ACWR (acute:chronic) using mean-per-day normalization
+    # # Avoid divide-by-zero
+    # res["acwr"] = float((fatiga_aguda / 7.0) / fatiga_cronica) if fatiga_cronica else None
+
+    # -------------------------
+    # Fatiga crónica (bases)
+    # -------------------------
+    res["fatiga_cronica_28d"] = _chronic_load(daily, end_day, 28)
+    res["fatiga_cronica_42d"] = _chronic_load(daily, end_day, 42)
+    res["fatiga_cronica_56d"] = _chronic_load(daily, end_day, 56)
+
+    # -------------------------
+    # Adaptación (por ventana)
+    # -------------------------
+    res["adaptacion_28d"] = (
+        res["fatiga_cronica_28d"] - (fatiga_aguda / 7.0)
+        if res["fatiga_cronica_28d"] else None
+    )
+
+    res["adaptacion_42d"] = (
+        res["fatiga_cronica_42d"] - (fatiga_aguda / 7.0)
+        if res["fatiga_cronica_42d"] else None
+    )
+
+    res["adaptacion_56d"] = (
+        res["fatiga_cronica_56d"] - (fatiga_aguda / 7.0)
+        if res["fatiga_cronica_56d"] else None
+    )
+
+    # -------------------------
+    # ACWR (por ventana)
+    # -------------------------
+    res["acwr_28d"] = (
+        (fatiga_aguda / 7.0) / res["fatiga_cronica_28d"]
+        if res["fatiga_cronica_28d"] else None
+    )
+
+    res["acwr_42d"] = (
+        (fatiga_aguda / 7.0) / res["fatiga_cronica_42d"]
+        if res["fatiga_cronica_42d"] else None
+    )
+
+    res["acwr_56d"] = (
+        (fatiga_aguda / 7.0) / res["fatiga_cronica_56d"]
+        if res["fatiga_cronica_56d"] else None
+    )
+
     res["minutos_sesion"] = float(day_row["minutos_total"].iloc[0]) if not day_row.empty else 0.0
     return res

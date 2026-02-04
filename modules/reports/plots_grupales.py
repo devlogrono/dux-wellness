@@ -26,7 +26,6 @@ def _ensure_fecha(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-
 # ============================================================
 # 📊 Carga semanal (UA)
 # ============================================================
@@ -82,7 +81,6 @@ def plot_carga_semanal(df: pd.DataFrame):
         hide_index=True,
     )
 
-
 # ============================================================
 # 📉 RPE promedio diario
 # ============================================================
@@ -115,7 +113,6 @@ def plot_rpe_promedio(df: pd.DataFrame):
         coloraxis_colorbar=dict(title="RPE"),
     )
     st.plotly_chart(fig, use_container_width=False)
-
 
 # ============================================================
 # ⚙️ Monotonía y fatiga aguda
@@ -154,7 +151,6 @@ def plot_monotonia_fatiga(df: pd.DataFrame):
         font_color=styles.BRAND_TEXT,
     )
     st.plotly_chart(fig, use_container_width=False)
-
 
 # ============================================================
 # 📈 Relación Carga Aguda : Crónica (ACWR)

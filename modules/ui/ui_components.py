@@ -111,7 +111,7 @@ def selection_header(jug_df: pd.DataFrame, comp_df: pd.DataFrame, records_df: pd
 
         else:  # modo == "reporte"
             hoy = datetime.date.today()
-            hace_15_dias = hoy - datetime.timedelta(days=15)
+            hace_15_dias = hoy - datetime.timedelta(days=60)
 
             start_default = hace_15_dias 
             end_default = hoy

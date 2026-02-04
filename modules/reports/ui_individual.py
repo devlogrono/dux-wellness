@@ -93,7 +93,6 @@ def player_block_dux(jugadora_seleccionada: dict, unavailable="N/A"):
           
     #st.divider()
 
-
 def metricas(df: pd.DataFrame, jug_sel, turno_sel, start, end) -> None:
     """Página de análisis individual de cargas y RPE por jugadora."""
 
@@ -114,21 +113,32 @@ def metricas(df: pd.DataFrame, jug_sel, turno_sel, start, end) -> None:
     with k1:
         st.metric(t("Minutos último día"), value=(f"{metrics['minutos_sesion']:.0f}" if pd.notna(metrics['minutos_sesion']) else "-"))
         st.metric(t("Carga mes"), help=t("Control de mesociclo"), value=(f"{metrics['carga_mes']:.0f}" if metrics["carga_mes"] is not None else "-"))
+        st.metric(t("Fatiga crónica (42d)"), help=t("Nivel de adaptación (Media) 42dias"), value=(f"{metrics['fatiga_cronica_42d']:.1f}" if metrics["fatiga_cronica_42d"] is not None else "-"))
+    
     with k2:
         st.metric(t("UA total último día"), help=t("Intensidad del entrenamiento o partido"), value=(f"{metrics['ua_total_dia']:.0f}" if metrics["ua_total_dia"] is not None else "-"))
         st.metric(t("Carga media mes"), help=t("Control de mesociclo"), value=(f"{metrics['carga_media_mes']:.2f}" if metrics["carga_media_mes"] is not None else "-"))
+        st.metric(t("Adaptación (42d)"), help=t("Balance entre fatiga aguda y crónica"), value=(f"{metrics['adaptacion_42d']:.2f}" if metrics["adaptacion_42d"] is not None else "-"))
+    
     with k3:
         st.metric(t("Carga semana"), help=t("Volumen del microciclo"), value=(f"{metrics['carga_semana']:.0f}" if metrics["carga_semana"] is not None else "-"))
         st.metric(t("Fatiga aguda (7d)"), help=t("Estrés agudo"), value=(f"{metrics['fatiga_aguda']:.0f}" if metrics["fatiga_aguda"] is not None else "-"))
+        st.metric(t("ACWR (42d)"), help=t("Relación entre fatiga aguda y crónica"), value=(f"{metrics['acwr_42d']:.2f}" if metrics["acwr_42d"] is not None else "-"))
+
     with k4:
         st.metric(t("Carga media semana"), help=t("Control semanal equilibrado"), value=(f"{metrics['carga_media_semana']:.2f}" if metrics["carga_media_semana"] is not None else "-"))
-        st.metric(t("Fatiga crónica (28d)"), help=t("Nivel de adaptación (Media)"), value=(f"{metrics['fatiga_cronica']:.1f}" if metrics["fatiga_cronica"] is not None else "-"))
+        st.metric(t("Fatiga crónica (28d)"), help=t("Nivel de adaptación (Media) 28 dias"), value=(f"{metrics['fatiga_cronica_28d']:.1f}" if metrics["fatiga_cronica_28d"] is not None else "-"))
+        st.metric(t("Fatiga crónica (56d)"), help=t("Nivel de adaptación (Media) 56 dias"), value=(f"{metrics['fatiga_cronica_56d']:.1f}" if metrics["fatiga_cronica_56d"] is not None else "-"))
+    
     with k5:
         st.metric(t("Monotonía semana"), help=t("Detectar sesiones demasiado parecidas"), value=(f"{metrics['monotonia_semana']:.2f}" if metrics["monotonia_semana"] is not None else "-"))
-        st.metric(t("Adaptación"), help=t("Balance entre fatiga aguda y crónica"), value=(f"{metrics['adaptacion']:.2f}" if metrics["adaptacion"] is not None else "-"))
+        st.metric(t("Adaptación (28d)"), help=t("Balance entre fatiga aguda y crónica"), value=(f"{metrics['adaptacion_28d']:.2f}" if metrics["adaptacion_28d"] is not None else "-"))
+        st.metric(t("Adaptación (56d)"), help=t("Balance entre fatiga aguda y crónica"), value=(f"{metrics['adaptacion_56d']:.2f}" if metrics["adaptacion_56d"] is not None else "-"))
+    
     with k6:
         st.metric(t("Variabilidad semanal"), help=t("Índice de variabilidad semanal"), value=(f"{metrics['variabilidad_semana']:.2f}" if metrics["variabilidad_semana"] is not None else "-"))
-        st.metric(t("ACWR"), help=t("Relación entre fatiga aguda y crónica"), value=(f"{metrics['acwr']:.2f}" if metrics["acwr"] is not None else "-"))
+        st.metric(t("ACWR (28d)"), help=t("Relación entre fatiga aguda y crónica"), value=(f"{metrics['acwr_28d']:.2f}" if metrics["acwr_28d"] is not None else "-"))
+        st.metric(t("ACWR (56d)"), help=t("Relación entre fatiga aguda y crónica"), value=(f"{metrics['acwr_56d']:.2f}" if metrics["acwr_56d"] is not None else "-"))
 
     resumen = _get_resumen_tecnico_carga(metrics)
     st.markdown(resumen, unsafe_allow_html=True)
@@ -215,7 +225,6 @@ def _get_resumen_tecnico_carga(metrics: dict) -> str:
     f"</div>" )
 
     return resumen
-
 
 def calcular_semaforo_riesgo(df: pd.DataFrame) -> tuple[str, str, float, float]:
     """
