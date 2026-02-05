@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 
 from modules.db.db_lesiones import get_wellness_pre_lesion
-from .metrics import compute_rpe_metrics, RPEFilters
+from .metrics import compute_rpe_metrics, RPEFilters, compute_rpe_timeseries
 from modules.util.util import (get_photo, clean_image_url, calcular_edad)
 from modules.i18n.i18n import t
 
@@ -13,6 +13,7 @@ from .plots_individuales import (
     grafico_duracion_rpe,
     grafico_acwr,
     grafico_wellness,
+    plot_carga_fatiga_recuperacion,
     tabla_wellness_individual
 )
 
@@ -100,6 +101,7 @@ def metricas(df: pd.DataFrame, jug_sel, turno_sel, start, end) -> None:
     flt = RPEFilters(jugadores=jug_sel or None, turnos=turno_sel or None, start=start, end=end)
     metrics = compute_rpe_metrics(df, flt)
 
+    #st.dataframe(metrics)
     # --- Validar datos ---
     if df is None or df.empty:
         st.info(t("No hay registros disponibles para análisis individual."))
@@ -113,33 +115,48 @@ def metricas(df: pd.DataFrame, jug_sel, turno_sel, start, end) -> None:
     with k1:
         st.metric(t("Minutos último día"), value=(f"{metrics['minutos_sesion']:.0f}" if pd.notna(metrics['minutos_sesion']) else "-"))
         st.metric(t("Carga mes"), help=t("Control de mesociclo"), value=(f"{metrics['carga_mes']:.0f}" if metrics["carga_mes"] is not None else "-"))
-        st.metric(t("Fatiga crónica (42d)"), help=t("Nivel de adaptación (Media) 42dias"), value=(f"{metrics['fatiga_cronica_42d']:.1f}" if metrics["fatiga_cronica_42d"] is not None else "-"))
-    
+        #st.metric(t("Recuperación (28d)"), help=t("Recuperación 28d"), value=(f"{metrics['recuperacion_28d']:.2f}" if metrics["recuperacion_28d"] is not None else "-"))
+            
     with k2:
         st.metric(t("UA total último día"), help=t("Intensidad del entrenamiento o partido"), value=(f"{metrics['ua_total_dia']:.0f}" if metrics["ua_total_dia"] is not None else "-"))
         st.metric(t("Carga media mes"), help=t("Control de mesociclo"), value=(f"{metrics['carga_media_mes']:.2f}" if metrics["carga_media_mes"] is not None else "-"))
-        st.metric(t("Adaptación (42d)"), help=t("Balance entre fatiga aguda y crónica"), value=(f"{metrics['adaptacion_42d']:.2f}" if metrics["adaptacion_42d"] is not None else "-"))
-    
+        
     with k3:
         st.metric(t("Carga semana"), help=t("Volumen del microciclo"), value=(f"{metrics['carga_semana']:.0f}" if metrics["carga_semana"] is not None else "-"))
         st.metric(t("Fatiga aguda (7d)"), help=t("Estrés agudo"), value=(f"{metrics['fatiga_aguda']:.0f}" if metrics["fatiga_aguda"] is not None else "-"))
-        st.metric(t("ACWR (42d)"), help=t("Relación entre fatiga aguda y crónica"), value=(f"{metrics['acwr_42d']:.2f}" if metrics["acwr_42d"] is not None else "-"))
-
+        
     with k4:
         st.metric(t("Carga media semana"), help=t("Control semanal equilibrado"), value=(f"{metrics['carga_media_semana']:.2f}" if metrics["carga_media_semana"] is not None else "-"))
-        st.metric(t("Fatiga crónica (28d)"), help=t("Nivel de adaptación (Media) 28 dias"), value=(f"{metrics['fatiga_cronica_28d']:.1f}" if metrics["fatiga_cronica_28d"] is not None else "-"))
-        st.metric(t("Fatiga crónica (56d)"), help=t("Nivel de adaptación (Media) 56 dias"), value=(f"{metrics['fatiga_cronica_56d']:.1f}" if metrics["fatiga_cronica_56d"] is not None else "-"))
-    
+        st.metric(t("Fatiga crónica (42d)"), help=t("Nivel de adaptación (Media) 42 dias"), value=(f"{metrics['fatiga_cronica_42d']:.1f}" if metrics["fatiga_cronica_42d"] is not None else "-"))
+        
     with k5:
         st.metric(t("Monotonía semana"), help=t("Detectar sesiones demasiado parecidas"), value=(f"{metrics['monotonia_semana']:.2f}" if metrics["monotonia_semana"] is not None else "-"))
-        st.metric(t("Adaptación (28d)"), help=t("Balance entre fatiga aguda y crónica"), value=(f"{metrics['adaptacion_28d']:.2f}" if metrics["adaptacion_28d"] is not None else "-"))
-        st.metric(t("Adaptación (56d)"), help=t("Balance entre fatiga aguda y crónica"), value=(f"{metrics['adaptacion_56d']:.2f}" if metrics["adaptacion_56d"] is not None else "-"))
-    
+        st.metric(t("Adaptación (42d)"), help=t("Balance entre fatiga aguda y crónica"), value=(f"{metrics['adaptacion_42d']:.2f}" if metrics["adaptacion_42d"] is not None else "-"))
+        
     with k6:
         st.metric(t("Variabilidad semanal"), help=t("Índice de variabilidad semanal"), value=(f"{metrics['variabilidad_semana']:.2f}" if metrics["variabilidad_semana"] is not None else "-"))
-        st.metric(t("ACWR (28d)"), help=t("Relación entre fatiga aguda y crónica"), value=(f"{metrics['acwr_28d']:.2f}" if metrics["acwr_28d"] is not None else "-"))
-        st.metric(t("ACWR (56d)"), help=t("Relación entre fatiga aguda y crónica"), value=(f"{metrics['acwr_56d']:.2f}" if metrics["acwr_56d"] is not None else "-"))
+        st.metric(t("ACWR (42d)"), help=t("Relación entre fatiga aguda y crónica"), value=(f"{metrics['acwr_42d']:.2f}" if metrics["acwr_42d"] is not None else "-"))
+        
+    # with st.expander(t("Fatiga, Adaptación, Recuperacion y ACWR (42d/56d)"), expanded=False):
+    #     col1, col2, col3, col4 = st.columns(4)
 
+    #     with col1:
+    #         st.metric(t("Fatiga crónica (42d)"), help=t("Nivel de adaptación (Media) 42dias"), value=(f"{metrics['fatiga_cronica_42d']:.1f}" if metrics["fatiga_cronica_42d"] is not None else "-"))
+    #         st.metric(t("Fatiga crónica (56d)"), help=t("Nivel de adaptación (Media) 56 dias"), value=(f"{metrics['fatiga_cronica_56d']:.1f}" if metrics["fatiga_cronica_56d"] is not None else "-"))
+
+    #     with col2:
+    #         st.metric(t("Adaptación (42d)"), help=t("Balance entre fatiga aguda y crónica"), value=(f"{metrics['adaptacion_42d']:.2f}" if metrics["adaptacion_42d"] is not None else "-"))
+    #         st.metric(t("Adaptación (56d)"), help=t("Balance entre fatiga aguda y crónica"), value=(f"{metrics['adaptacion_56d']:.2f}" if metrics["adaptacion_56d"] is not None else "-"))
+
+    #     with col3:
+    #         st.metric(t("ACWR (42d)"), help=t("Relación entre fatiga aguda y crónica"), value=(f"{metrics['acwr_42d']:.2f}" if metrics["acwr_42d"] is not None else "-"))
+    #         st.metric(t("ACWR (56d)"), help=t("Relación entre fatiga aguda y crónica"), value=(f"{metrics['acwr_56d']:.2f}" if metrics["acwr_56d"] is not None else "-"))
+
+    #     with col4:
+    #         st.metric(t("Recuperación (42d)"), help=t("Recuperación 42d"), value=(f"{metrics['recuperacion_42d']:.2f}" if metrics["recuperacion_42d"] is not None else "-"))
+    #         st.metric(t("Recuperación (56d)"), help=t("Recuperación 56d"), value=(f"{metrics['recuperacion_56d']:.2f}" if metrics["recuperacion_56d"] is not None else "-"))
+
+    
     resumen = _get_resumen_tecnico_carga(metrics)
     st.markdown(resumen, unsafe_allow_html=True)
 
@@ -160,13 +177,14 @@ def _get_resumen_tecnico_carga(metrics: dict) -> str:
     carga_semana = metrics.get("carga_semana", 0) or 0
     carga_mes = metrics.get("carga_mes", 0) or 0
     fatiga_aguda = metrics.get("fatiga_aguda", 0) or 0
-    fatiga_cronica = metrics.get("fatiga_cronica", 0) or 0
-    acwr = metrics.get("acwr")
+    fatiga_cronica = metrics.get("fatiga_cronica_42d", 0) or 0
+    acwr = metrics.get("acwr_42d") or 0
     monotonia = metrics.get("monotonia_semana")
-    adaptacion = metrics.get("adaptacion")
+    adaptacion = metrics.get("adaptacion_42d")
     ua_total_dia = metrics.get("ua_total_dia", 0) or 0
     minutos_dia = metrics.get("minutos_sesion", 0) or 0
-
+    #st.dataframe(metrics)
+    
     # --- CARGA SEMANAL ---
     if carga_semana > 2500:
         carga_estado = color_text(t("alta"), "#E53935")  # rojo
@@ -223,7 +241,7 @@ def _get_resumen_tecnico_carga(metrics: dict) -> str:
     f"{color_text(f'{fatiga_cronica:.1f} UA', '#607D8B')} {t('de media')}, {t('indicando una adaptación')} {estado_adapt}. " 
     f"{t('El índice ACWR sugiere')} {riesgo}, {t('y la monotonía semanal refleja')} {variabilidad}." 
     f"</div>" )
-
+    #st.text(f"ua total dia: {ua_total_dia}, minutos dia: {minutos_dia}")
     return resumen
 
 def calcular_semaforo_riesgo(df: pd.DataFrame) -> tuple[str, str, float, float]:
@@ -277,29 +295,36 @@ def graficos_individuales(df: pd.DataFrame):
         return
 
     df_player = df.copy().sort_values("fecha_sesion")
+    df_states = compute_rpe_timeseries(df_player)
 
     #st.divider()
     st.markdown(t("### **Gráficos**"))
 
     tabs = st.tabs([
         t("Wellness"),
+        t("Estado de Carga"),
         t("Fatiga y ACWR"),
         t("RPE y UA"),
         t("Duración vs RPE"),
         t("Wellness + Lesiones")
     ])
 
+
     with tabs[0]: 
         tabla_wellness_individual(df_player)
         st.divider()
         grafico_wellness(df_player)
     with tabs[1]: 
-        grafico_acwr(df_player)
+        df_states = compute_rpe_timeseries(df_player)
+        plot_carga_fatiga_recuperacion(df_states)
     with tabs[2]: 
-        grafico_rpe_ua(df_player)
+        #grafico_acwr(df_player)
+        grafico_acwr(df_states)
     with tabs[3]: 
-        grafico_duracion_rpe(df_player)
+        grafico_rpe_ua(df_player)
     with tabs[4]: 
+        grafico_duracion_rpe(df_player)
+    with tabs[5]: 
         id_jugadora = df_player["id_jugadora"].iloc[0]
         pre_lesion = get_wellness_pre_lesion(id_jugadora=id_jugadora, dias_previos=14, as_df=True)
         if not pre_lesion.empty: 
@@ -307,3 +332,21 @@ def graficos_individuales(df: pd.DataFrame):
             #st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No hay registros de lesiones.")
+
+
+def selector_ventana_cronica():
+    # -------------------------
+    # Selector de ventana
+    # -------------------------
+    with st.columns([1, 3])[0]:
+        ventana_cronica = st.selectbox(
+            t("Ventana de referencia (días)"),
+            options=[28, 42, 56],
+            index=1,  # 42d por defecto
+            help=t(
+                "Selecciona la ventana temporal usada para calcular la fatiga crónica, "
+                "recuperación y ACWR."
+            ),
+            key="ventana_cronica_selector",
+        )
+    return ventana_cronica

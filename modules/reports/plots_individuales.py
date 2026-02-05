@@ -28,7 +28,6 @@ def grafico_rpe_ua(df: pd.DataFrame):
     else:
         st.info(t("No hay datos de RPE o UA para graficar."))
 
-
 # 2️⃣ Duración vs RPE ------------------------------------------------
 def grafico_duracion_rpe(df: pd.DataFrame):
     #st.markdown("#### Relación entre duración y esfuerzo percibido")
@@ -58,74 +57,182 @@ def grafico_duracion_rpe(df: pd.DataFrame):
     else:
         st.info(t("No hay datos de minutos o RPE para graficar."))
 
-
 # 3️⃣ ACWR -----------------------------------------------------------
-def grafico_acwr(df: pd.DataFrame):
-    #st.markdown("#### Evolución del índice ACWR (Relación Agudo:Crónico)")
+# def grafico_acwr(df: pd.DataFrame):
+#     #st.markdown("#### Evolución del índice ACWR (Relación Agudo:Crónico)")
 
-    if "ua" not in df.columns:
-        st.info(t("No hay datos de carga interna (UA) para calcular ACWR."))
+#     if "ua" not in df.columns:
+#         st.info(t("No hay datos de carga interna (UA) para calcular ACWR."))
+#         return
+
+#     df = df.copy()
+#     df["ua"] = pd.to_numeric(df["ua"], errors="coerce")
+#     df["acute7"] = df["ua"].rolling(7, min_periods=3).mean()
+#     df["chronic28"] = df["ua"].rolling(28, min_periods=7).mean()
+#     df["acwr"] = df["acute7"] / df["chronic28"]
+#     df = df.dropna(subset=["acwr"])
+
+#     if df.empty:
+#         st.info(t("No hay suficientes datos para calcular ACWR."))
+#         return
+
+#     def _zone(v: float) -> str:
+#         if v < 0.8: return "Subcarga"
+#         elif v < 1.3: return "Sweet Spot"
+#         elif v < 1.5: return "Elevada"
+#         else: return "Peligro"
+
+#     df["zona"] = df["acwr"].apply(_zone)
+
+#     bandas = pd.DataFrame([
+#         {"y0": 0.0, "y1": 0.8, "color": "#E3F2FD"},
+#         {"y0": 0.8, "y1": 1.3, "color": "#C8E6C9"},
+#         {"y0": 1.3, "y1": 1.5, "color": "#FFE0B2"},
+#         {"y0": 1.5, "y1": 3.0, "color": "#FFCDD2"}
+#     ])
+
+#     bg = alt.Chart(bandas).mark_rect(opacity=0.6).encode(
+#         y="y0:Q", y2="y1:Q",
+#         color=alt.Color("color:N", scale=None, legend=None)
+#     )
+
+#     rules = alt.Chart(pd.DataFrame({"y": [0.8, 1.3, 1.5]})).mark_rule(
+#         color="black", strokeDash=[4, 2], opacity=0.7
+#     ).encode(y="y:Q")
+
+#     base = alt.Chart(df).encode(
+#         x=alt.X("fecha_sesion:T", title="Fecha", axis=alt.Axis(format="%b %d")),
+#         y=alt.Y("acwr:Q", title="ACWR", scale=alt.Scale(domain=[0, max(2.5, df["acwr"].max() + 0.2)]))
+#     )
+
+#     line = base.mark_line(color="black", strokeWidth=2, interpolate="monotone")
+#     pts = base.mark_circle(size=70).encode(
+#         color=alt.Color("zona:N", scale=alt.Scale(
+#             domain=["Subcarga", "Sweet Spot", "Elevada", "Peligro"],
+#             range=["#64B5F6", "#2ca25f", "#fdae6b", "#d62728"]
+#         )),
+#         tooltip=["fecha_sesion:T", alt.Tooltip("acwr:Q", format=".2f")]
+#     )
+
+#     labels = alt.Chart(pd.DataFrame([
+#         {"y": 0.4, "text": "Subcarga"},
+#         {"y": 1.05, "text": "Punto Óptimo"},
+#         {"y": 1.4, "text": "Zona Elevada"},
+#         {"y": 1.8, "text": "Peligro"}
+#     ])).mark_text(align="left", dx=5, fontSize=11, color="#444").encode(y="y:Q", text="text:N")
+
+#     chart = alt.layer(bg, rules, line, pts, labels).properties(height=320, width="container", title=t("Evolución del índice ACWR (Relación Agudo:Crónico)"))
+#     st.altair_chart(chart)
+
+def grafico_acwr(
+    df_states: pd.DataFrame,
+    ventana_cronica: int = 42,
+):
+    """
+    Gráfico de evolución del ACWR a partir de un DataFrame ya calculado
+    (compute_rpe_timeseries).
+    """
+
+    col_acwr = f"acwr_{ventana_cronica}d"
+
+    if df_states.empty or col_acwr not in df_states.columns:
+        st.info(t("No hay datos suficientes para mostrar el ACWR."))
         return
 
-    df = df.copy()
-    df["ua"] = pd.to_numeric(df["ua"], errors="coerce")
-    df["acute7"] = df["ua"].rolling(7, min_periods=3).mean()
-    df["chronic28"] = df["ua"].rolling(28, min_periods=7).mean()
-    df["acwr"] = df["acute7"] / df["chronic28"]
-    df = df.dropna(subset=["acwr"])
+    df = df_states[["fecha_sesion", col_acwr]].dropna().copy()
+    df.rename(columns={col_acwr: "acwr"}, inplace=True)
 
     if df.empty:
         st.info(t("No hay suficientes datos para calcular ACWR."))
         return
 
+    # -------------------------
+    # Clasificación por zonas
+    # -------------------------
     def _zone(v: float) -> str:
-        if v < 0.8: return "Subcarga"
-        elif v < 1.3: return "Sweet Spot"
-        elif v < 1.5: return "Elevada"
-        else: return "Peligro"
+        if v < 0.8:
+            return "Subcarga"
+        elif v < 1.3:
+            return "Sweet Spot"
+        elif v < 1.5:
+            return "Elevada"
+        else:
+            return "Peligro"
 
     df["zona"] = df["acwr"].apply(_zone)
 
+    # -------------------------
+    # Bandas de referencia
+    # -------------------------
     bandas = pd.DataFrame([
         {"y0": 0.0, "y1": 0.8, "color": "#E3F2FD"},
         {"y0": 0.8, "y1": 1.3, "color": "#C8E6C9"},
         {"y0": 1.3, "y1": 1.5, "color": "#FFE0B2"},
-        {"y0": 1.5, "y1": 3.0, "color": "#FFCDD2"}
+        {"y0": 1.5, "y1": 3.0, "color": "#FFCDD2"},
     ])
 
     bg = alt.Chart(bandas).mark_rect(opacity=0.6).encode(
-        y="y0:Q", y2="y1:Q",
-        color=alt.Color("color:N", scale=None, legend=None)
+        y="y0:Q",
+        y2="y1:Q",
+        color=alt.Color("color:N", scale=None, legend=None),
     )
 
-    rules = alt.Chart(pd.DataFrame({"y": [0.8, 1.3, 1.5]})).mark_rule(
+    rules = alt.Chart(
+        pd.DataFrame({"y": [0.8, 1.3, 1.5]})
+    ).mark_rule(
         color="black", strokeDash=[4, 2], opacity=0.7
     ).encode(y="y:Q")
 
     base = alt.Chart(df).encode(
-        x=alt.X("fecha_sesion:T", title="Fecha", axis=alt.Axis(format="%b %d")),
-        y=alt.Y("acwr:Q", title="ACWR", scale=alt.Scale(domain=[0, max(2.5, df["acwr"].max() + 0.2)]))
+        x=alt.X(
+            "fecha_sesion:T",
+            title=t("Fecha"),
+            axis=alt.Axis(format="%b %d"),
+        ),
+        y=alt.Y(
+            "acwr:Q",
+            title="ACWR",
+            scale=alt.Scale(domain=[0, max(2.5, df["acwr"].max() + 0.2)]),
+        ),
     )
 
-    line = base.mark_line(color="black", strokeWidth=2, interpolate="monotone")
+    line = base.mark_line(
+        color="black", strokeWidth=2, interpolate="monotone"
+    )
+
     pts = base.mark_circle(size=70).encode(
-        color=alt.Color("zona:N", scale=alt.Scale(
-            domain=["Subcarga", "Sweet Spot", "Elevada", "Peligro"],
-            range=["#64B5F6", "#2ca25f", "#fdae6b", "#d62728"]
-        )),
-        tooltip=["fecha_sesion:T", alt.Tooltip("acwr:Q", format=".2f")]
+        color=alt.Color(
+            "zona:N",
+            scale=alt.Scale(
+                domain=["Subcarga", "Sweet Spot", "Elevada", "Peligro"],
+                range=["#64B5F6", "#2ca25f", "#fdae6b", "#d62728"],
+            ),
+        ),
+        tooltip=[
+            "fecha_sesion:T",
+            alt.Tooltip("acwr:Q", format=".2f"),
+            "zona:N",
+        ],
     )
 
     labels = alt.Chart(pd.DataFrame([
         {"y": 0.4, "text": "Subcarga"},
-        {"y": 1.05, "text": "Punto Óptimo"},
-        {"y": 1.4, "text": "Zona Elevada"},
-        {"y": 1.8, "text": "Peligro"}
-    ])).mark_text(align="left", dx=5, fontSize=11, color="#444").encode(y="y:Q", text="text:N")
+        {"y": 1.05, "text": "Punto óptimo"},
+        {"y": 1.4, "text": "Zona elevada"},
+        {"y": 1.8, "text": "Peligro"},
+    ])).mark_text(
+        align="left", dx=5, fontSize=11, color="#444"
+    ).encode(y="y:Q", text="text:N")
 
-    chart = alt.layer(bg, rules, line, pts, labels).properties(height=320, width="container", title=t("Evolución del índice ACWR (Relación Agudo:Crónico)"))
+    chart = alt.layer(
+        bg, rules, line, pts, labels
+    ).properties(
+        height=320,
+        width="container",
+        title=t(f"Evolución del índice ACWR"),
+    )
+
     st.altair_chart(chart)
-
 
 # 4️⃣ Wellness -------------------------------------------------------
 def grafico_wellness(df: pd.DataFrame):
@@ -140,7 +247,6 @@ def grafico_wellness(df: pd.DataFrame):
         st.plotly_chart(fig)
     else:
         st.info(t("No hay datos de bienestar para graficar."))
-
 
 # 5️⃣ Riesgo de lesión -----------------------------------------------
 def grafico_riesgo_lesion(df: pd.DataFrame):
@@ -297,10 +403,14 @@ def tabla_wellness_individual(df: pd.DataFrame):
             ]
         elif col.name == "Promedio Wellness":
             return [
-                # Verde óptimo, amarillo moderado, rojo bajo
-                "background-color:#27AE60; color:white; font-weight:bold; text-align:center;" if v >= 4 else
+                # Rojo bajo, amarillo moderado, rVerde óptimo 
+                # "background-color:#27AE60; color:white; font-weight:bold; text-align:center;" if v >= 4 else
+                # "background-color:#F1C40F; color:black; text-align:center;" if 3 <= v < 4 else
+                # "background-color:#E74C3C; color:white; font-weight:bold; text-align:center;"
+
+                "background-color:#E74C3C; color:white; font-weight:bold; text-align:center;" if v >= 4 else
                 "background-color:#F1C40F; color:black; text-align:center;" if 3 <= v < 4 else
-                "background-color:#E74C3C; color:white; font-weight:bold; text-align:center;"
+                "background-color:#27AE60; color:white; font-weight:bold; text-align:center;"
                 for v in col
             ]
         return [""] * len(col)
@@ -314,11 +424,11 @@ def tabla_wellness_individual(df: pd.DataFrame):
 
     st.dataframe(styled)        
 
-    caption_green = t("**Valores altos indican mejor bienestar** en Recuperación, Energía y Sueño.")
-    caption_red = t("**Valores bajos indican mejor bienestar** en Estrés y Dolor (escala invertida).")
-    # --- Explicación ---
-    st.caption(f"🟩 {caption_green}")
-    st.caption(f"🟥 {caption_red}")
+    # caption_green = t("**Valores altos indican mejor bienestar** en Recuperación, Energía y Sueño.")
+    # caption_red = t("**Valores bajos indican mejor bienestar** en Estrés y Dolor (escala invertida).")
+    # # --- Explicación ---
+    # st.caption(f"🟩 {caption_green}")
+    # st.caption(f"🟥 {caption_red}")
 
 # Lesiones ------------------------------------------------
 
@@ -431,3 +541,71 @@ def grafico_wellness_pre_lesion(df_pre: pd.DataFrame):
 
     #return fig
     st.plotly_chart(fig, use_container_width=True)
+
+### RPE ------------------------------------------------
+
+def plot_carga_fatiga_recuperacion(df_states: pd.DataFrame, ventana_cronica: int = 42):
+    """
+    Gráfico tipo Excel:
+    - Barras: UA diaria
+    - Líneas: Fatiga aguda y crónica
+    - Línea: Recuperación
+    """
+
+    if df_states.empty:
+        return None
+
+    fig = go.Figure()
+
+    # --- UA diaria ---
+    fig.add_bar(
+        x=df_states["fecha_sesion"],
+        y=df_states["ua_diaria"],
+        name="Carga diaria (UA)",
+        marker_color="rgba(150,150,150,0.4)",
+    )
+
+    # --- Fatiga aguda ---
+    fig.add_trace(
+        go.Scatter(
+            x=df_states["fecha_sesion"],
+            y=df_states["fatiga_aguda_7d"],
+            mode="lines",
+            name="Fatiga aguda (7d)",
+            line=dict(color="#E53935", width=2),
+        )
+    )
+
+    # --- Fatiga crónica ---
+    fig.add_trace(
+        go.Scatter(
+            x=df_states["fecha_sesion"],
+            y=df_states[f"fatiga_cronica_{ventana_cronica}d"],
+            mode="lines",
+            name=f"Fatiga crónica ({ventana_cronica}d)",
+            line=dict(color="#1E88E5", width=2),
+        )
+    )
+
+    # --- Recuperación ---
+    fig.add_trace(
+        go.Scatter(
+            x=df_states["fecha_sesion"],
+            y=df_states[f"recuperacion_{ventana_cronica}d"],
+            mode="lines",
+            name=f"Recuperación",
+            line=dict(color="#43A047", width=2, dash="dot"),
+        )
+    )
+
+    fig.update_layout(
+        title=f"Carga, Fatiga y Recuperación",
+        xaxis_title="Fecha",
+        yaxis_title="UA / día",
+        plot_bgcolor="white",
+        hovermode="x unified",
+        #legend_title_text="Métricas",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    )
+
+    st.plotly_chart(fig)

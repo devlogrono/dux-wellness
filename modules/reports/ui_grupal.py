@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 from modules.i18n.i18n import t
 from modules.reports.metrics import RPEFilters, compute_rpe_metrics
-from .plots_grupales import (plot_carga_semanal, plot_rpe_promedio, tabla_resumen)
+from .plots_grupales import (plot_carga_semanal, plot_estado_carga_grupal, plot_rpe_promedio, tabla_resumen)
 
 def group_dashboard(df_filtrado: pd.DataFrame):
     """Panel grupal con gráficos y tablas agregadas."""
@@ -13,18 +13,22 @@ def group_dashboard(df_filtrado: pd.DataFrame):
         st.info(t("No hay datos disponibles para el periodo seleccionado."))
         st.stop()
 
-    st.divider()
+    df_estado = compute_rpe_timeseries_group(df_filtrado)
+    
+    #st.divider()
     tabs = st.tabs([
+        t(":material/show_chart: Estado de carga"),
         t(":material/monitor_weight: Carga y esfuerzo"),
-        t(":material/trending_up: Índices de control"),
-        t(":material/table_chart: Resumen tabular"),
+        t(":material/trending_up: RPE"),
+        t(":material/table_chart: Resumen"),
     ])
-
     with tabs[0]:
+        plot_estado_carga_grupal(df_estado)
+    with tabs[1]:
         plot_carga_semanal(df_filtrado)
-    with tabs[1]: 
-        plot_rpe_promedio(df_filtrado)
     with tabs[2]: 
+        plot_rpe_promedio(df_filtrado)
+    with tabs[3]: 
         tabla_resumen(df_filtrado)
 
 def metricas_grupal(df: pd.DataFrame,
@@ -67,48 +71,27 @@ def metricas_grupal(df: pd.DataFrame,
     st.divider()
     st.markdown(t("### **Resumen de carga grupal**"))
 
-    k1, k2, k3, k4, k5, k6 = st.columns(6)
+    k1, k2, k3, k4, k5 = st.columns(5)
 
     with k1:
         st.metric(t("Jugadoras activas"), grupo["jugadoras_activas"])
-        st.metric(t("F. crónica media (28d)"), f"{grupo['fatiga_cronica_28d_media']:.1f}")
+        st.metric(t("Fatiga aguda media (7d)"), f"{grupo['fatiga_aguda_media']:.0f}")
 
     with k2:
         st.metric(t("Carga semana media"), f"{grupo['carga_semana_media']:.0f}")
-        st.metric(t("ACWR medio 28d"), f"{grupo['acwr_medio_28d']:.2f}")
+        st.metric(t("F. crónica media (42d)"), f"{grupo['fatiga_cronica_42d_media']:.1f}")
 
     with k3:
         st.metric(t("Dispersión de carga"), f"{grupo['dispersion_carga']:.1f}")
-        st.metric(t("F. crónica media (42d)"), f"{grupo['fatiga_cronica_42d_media']:.1f}")
+        st.metric(t("ACWR medio 42d"), f"{grupo['acwr_medio_42d']:.2f}")
 
     with k4:
         st.metric(t("Monotonía media"), f"{df_players['monotonia'].mean():.2f}")
-        st.metric(t("ACWR medio 42d"), f"{grupo['acwr_medio_42d']:.2f}")
+        #st.metric(t("ACWR medio 42d"), f"{grupo['acwr_medio_42d']:.2f}")
        
-
     with k5:
         st.metric(t("Carga semana total"), f"{grupo['carga_semana_total']:.0f}")
-        st.metric(t("F. crónica media (56d)"), f"{grupo['fatiga_cronica_56d_media']:.1f}")        
-
-    with k6:
-        st.metric(t("Fatiga aguda media (7d)"), f"{grupo['fatiga_aguda_media']:.0f}")
-        st.metric(t("ACWR medio 56d"), f"{grupo['acwr_medio_56d']:.2f}")
-
-        # pct_acwr_alto = (df_players["acwr_28d"] > 1.3).sum() / len(df_players) * 100
-        # st.metric(
-        #     t("% ACWR alto"),
-        #     f"{pct_acwr_alto:.0f}%",
-        #     help=t(
-        #         "Porcentaje de jugadoras con ACWR individual superior a 1.3. "
-        #         "El ACWR compara la carga aguda (media diaria 7 días) con la carga "
-        #         "crónica (media diaria 28 días). Este indicador muestra cuántas "
-        #         "jugadoras del grupo se encuentran en una zona de mayor riesgo "
-        #         "relativo de carga y requieren seguimiento individual. "
-        #         "No representa un riesgo colectivo del equipo."
-        #     )
-        # )
-        # st.metric(t("Adaptación media"), f"{df_players['adaptacion'].mean():.2f}")
-
+        
     # --- resumen técnico ---
     resumen = _get_resumen_tecnico_carga_grupal(grupo)
     st.markdown(resumen, unsafe_allow_html=True)
@@ -122,8 +105,8 @@ def _get_resumen_tecnico_carga_grupal(grupo: dict) -> str:
         f"<b>{grupo['carga_semana_media']:.0f} UA</b>. "
         f"{t('La fatiga aguda media es de')} "
         f"<b>{grupo['fatiga_aguda_media']:.0f} UA</b> "
-        f"{t('y el ACWR 28d medio del grupo es')} "
-        f"<b>{grupo['acwr_medio_28d']:.2f}</b>. "
+        f"{t('y el ACWR medio del grupo es')} "
+        f"<b>{grupo['acwr_medio_42d']:.2f}</b>. "
         f"{t('La dispersión de carga indica una distribución')} "
         f"<b>{'heterogénea' if grupo['dispersion_carga'] > 300 else 'homogénea'}</b>."
     )
@@ -213,3 +196,88 @@ def aggregate_group_metrics(df_players: pd.DataFrame) -> dict:
             (df_players["acwr"] > 1.3).sum() / len(df_players) * 100
         ),
     }
+
+# ============================================================
+# 📈 Estado de Carga
+# ============================================================
+
+def compute_rpe_timeseries_group(
+    df: pd.DataFrame,
+    ventana_aguda: int = 7,
+    ventana_cronica: int = 42,
+) -> pd.DataFrame:
+    """
+    Calcula el estado de carga diario A NIVEL GRUPAL.
+
+    Devuelve un DataFrame con:
+    - UA diaria grupal (suma)
+    - Fatiga aguda (media móvil)
+    - Fatiga crónica (media móvil)
+    - Recuperación
+    - ACWR
+    """
+
+    if df is None or df.empty:
+        return pd.DataFrame()
+
+    df = df.copy()
+
+    # -------------------------
+    # Fecha
+    # -------------------------
+    df["fecha_sesion"] = pd.to_datetime(df["fecha_sesion"], errors="coerce")
+    df = df.dropna(subset=["fecha_sesion"])
+
+    # -------------------------
+    # UA diaria grupal (SUMA)
+    # -------------------------
+    daily = (
+        df.groupby("fecha_sesion", as_index=False)["ua"]
+        .sum()
+        .rename(columns={"ua": "ua_grupal"})
+        .set_index("fecha_sesion")
+        .asfreq("D")
+    )
+
+    daily["ua_grupal"] = daily["ua_grupal"].fillna(0)
+
+    # -------------------------
+    # Fatiga aguda (7d)
+    # -------------------------
+    daily["fatiga_aguda_7d"] = (
+        daily["ua_grupal"]
+        .rolling(window=ventana_aguda, min_periods=1)
+        .mean()
+    )
+
+    # -------------------------
+    # Fatiga crónica (Xd)
+    # -------------------------
+    col_cronica = f"fatiga_cronica_{ventana_cronica}d"
+    daily[col_cronica] = (
+        daily["ua_grupal"]
+        .rolling(window=ventana_cronica, min_periods=1)
+        .mean()
+    )
+
+    # -------------------------
+    # Recuperación
+    # -------------------------
+    daily[f"recuperacion_{ventana_cronica}d"] = (
+        daily[col_cronica] - daily["fatiga_aguda_7d"]
+    )
+
+    # -------------------------
+    # ACWR
+    # -------------------------
+    daily[f"acwr_{ventana_cronica}d"] = (
+        daily["fatiga_aguda_7d"] / daily[col_cronica]
+    )
+
+    # -------------------------
+    # Redondeo
+    # -------------------------
+    num_cols = daily.select_dtypes("number").columns
+    daily[num_cols] = daily[num_cols].round(2)
+
+    return daily.reset_index()
