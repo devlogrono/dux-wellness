@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.express as px
 from modules.app_config import styles
 from modules.i18n.i18n import t
+import plotly.graph_objects as go
 
 # ============================================================
 # 🧭 Función auxiliar de fecha
@@ -229,3 +230,81 @@ def tabla_resumen(df_filtrado):
             }
         ),
     )
+
+# ============================================================
+# 📈 Estado de Carga
+# ============================================================
+import plotly.graph_objects as go
+import streamlit as st
+from modules.i18n.i18n import t
+
+def plot_estado_carga_grupal(
+    df,
+    ventana_cronica: int = 42,
+):
+    if df is None or df.empty:
+        st.info(t("No hay datos suficientes para el estado de carga grupal."))
+        return
+
+    col_cronica = f"fatiga_cronica_{ventana_cronica}d"
+    col_recup = f"recuperacion_{ventana_cronica}d"
+
+    # Validación mínima de columnas
+    required = {"fecha_sesion", "ua_grupal", "fatiga_aguda_7d", col_cronica}
+    missing = required - set(df.columns)
+    if missing:
+        st.info(t("Faltan columnas para graficar el estado de carga grupal."))
+        st.write("Missing:", list(missing))
+        return
+
+    fig = go.Figure()
+
+    # UA diaria (barras)
+    fig.add_trace(go.Bar(
+        x=df["fecha_sesion"],
+        y=df["ua_grupal"],
+        name=t("UA diaria grupal"),
+        opacity=0.6
+    ))
+
+    # Fatiga aguda (7d)
+    fig.add_trace(go.Scatter(
+        x=df["fecha_sesion"],
+        y=df["fatiga_aguda_7d"],
+        name=t("Fatiga aguda (7d)"),
+        mode="lines",
+        line=dict(width=2)
+    ))
+
+    # Fatiga crónica (ventana)
+    fig.add_trace(go.Scatter(
+        x=df["fecha_sesion"],
+        y=df[col_cronica],
+        name=t(f"Fatiga crónica ({ventana_cronica}d)"),
+        mode="lines",
+        line=dict(width=2)
+    ))
+
+    # ✅ Recuperación (ventana) – solo si existe
+    if col_recup in df.columns:
+        fig.add_trace(go.Scatter(
+            x=df["fecha_sesion"],
+            y=df[col_recup],
+            name=t(f"Recuperación"),
+            mode="lines",
+            line=dict(width=2, dash="dot")
+        ))
+    else:
+        st.caption(t(f"No se encontró la columna {col_recup}. No se grafica recuperación."))
+
+    fig.update_layout(
+        title=t("Carga, Fatiga y Recuperación"),
+        xaxis_title=t("Fecha"),
+        yaxis_title=t("Carga (UA)"),
+        barmode="overlay",
+        plot_bgcolor="white",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        height=420
+    )
+
+    st.plotly_chart(fig, use_container_width=False)

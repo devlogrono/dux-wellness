@@ -6,6 +6,7 @@ from datetime import date, timedelta
 import numpy as np
 import pandas as pd
 from typing import Optional
+import streamlit as st
 
 @dataclass
 class RPEFilters:
@@ -84,7 +85,6 @@ def _chronic_load(daily: pd.DataFrame, end_day: date, days: int) -> float:
     ]
     return float(window["ua_total"].mean()) if not window.empty else 0.0
 
-
 def compute_rpe_metrics(df_raw: pd.DataFrame, flt: RPEFilters) -> dict:
     df = _prepare_checkout_df(df_raw)
     #st.dataframe(df)
@@ -100,6 +100,7 @@ def compute_rpe_metrics(df_raw: pd.DataFrame, flt: RPEFilters) -> dict:
         "carga_media_mes": None,
         "monotonia_semana": None,
         "fatiga_aguda": None,
+        "fatiga_aguda_diaria": None,
         "fatiga_cronica_28d": None,
         "fatiga_cronica_42d": None,
         "fatiga_cronica_56d": None,
@@ -109,6 +110,9 @@ def compute_rpe_metrics(df_raw: pd.DataFrame, flt: RPEFilters) -> dict:
         "acwr_28d": None,
         "acwr_42d": None,
         "acwr_56d": None,
+        "recuperacion_28d": None,
+        "recuperacion_42d": None,
+        "recuperacion_56d": None,
         "variabilidad_semana": None,
         "daily_table": pd.DataFrame(),
     }
@@ -141,7 +145,7 @@ def compute_rpe_metrics(df_raw: pd.DataFrame, flt: RPEFilters) -> dict:
     day_row = daily[daily["fecha_sesion"] == end_day]
     #st.dataframe(day_row)
     res["ua_total_dia"] = float(day_row["ua_total"].iloc[0]) if not day_row.empty else 0.0
-
+    #st.dataframe(res)
     # Month metrics (calendar month of end_day)
     m_start, m_end = _month_range(end_day)
     daily_month = daily[(daily["fecha_sesion"] >= m_start) & (daily["fecha_sesion"] <= m_end)]
@@ -194,6 +198,26 @@ def compute_rpe_metrics(df_raw: pd.DataFrame, flt: RPEFilters) -> dict:
         res["fatiga_cronica_56d"] - (fatiga_aguda / 7.0)
         if res["fatiga_cronica_56d"] else None
     )
+    # -------------------------
+    # Recuperación (por ventana)
+    # -------------------------
+    fatiga_aguda_diaria = fatiga_aguda / 7.0
+    res["fatiga_aguda_diaria"] = float(fatiga_aguda_diaria)
+
+    res["recuperacion_28d"] = (
+       res["fatiga_cronica_28d"] -  fatiga_aguda_diaria
+       if res["fatiga_cronica_28d"] else None
+    )  
+
+    res["recuperacion_42d"] = (
+       res["fatiga_cronica_42d"] - fatiga_aguda_diaria
+       if res["fatiga_cronica_42d"] else None   
+    )
+
+    res["recuperacion_56d"] = (
+       res["fatiga_cronica_56d"] - fatiga_aguda_diaria
+       if res["fatiga_cronica_56d"] else None       
+    )
 
     # -------------------------
     # ACWR (por ventana)
@@ -215,3 +239,85 @@ def compute_rpe_metrics(df_raw: pd.DataFrame, flt: RPEFilters) -> dict:
 
     res["minutos_sesion"] = float(day_row["minutos_total"].iloc[0]) if not day_row.empty else 0.0
     return res
+
+import pandas as pd
+
+def compute_rpe_timeseries(
+    df: pd.DataFrame,
+    ventana_aguda: int = 7,
+    ventana_cronica: int = 42,
+) -> pd.DataFrame:
+    """
+    Genera un DataFrame diario continuo con estados de carga interna:
+    - UA diaria
+    - Fatiga aguda (media móvil, UA/día)
+    - Fatiga crónica (media móvil, UA/día)
+    - Recuperación (crónica - aguda)
+    - ACWR
+
+    Todas las métricas están en UA/día y son graficables.
+    """
+
+    if df is None or df.empty:
+        return pd.DataFrame()
+
+    df = df.copy()
+
+    # -------------------------
+    # Asegurar fecha
+    # -------------------------
+    df["fecha_sesion"] = pd.to_datetime(df["fecha_sesion"], errors="coerce")
+    df = df.dropna(subset=["fecha_sesion"])
+
+    # -------------------------
+    # UA diaria (suma por día)
+    # -------------------------
+    daily = (
+        df.groupby("fecha_sesion", as_index=False)["ua"]
+        .sum()
+        .rename(columns={"ua": "ua_diaria"})
+        .set_index("fecha_sesion")
+        .asfreq("D")
+    )
+
+    # Días sin sesión = 0 UA
+    daily["ua_diaria"] = daily["ua_diaria"].fillna(0)
+
+    # -------------------------
+    # Fatiga aguda (7d)
+    # -------------------------
+    daily["fatiga_aguda_7d"] = (
+        daily["ua_diaria"]
+        .rolling(window=ventana_aguda, min_periods=1)
+        .mean()
+    )
+
+    # -------------------------
+    # Fatiga crónica (Xd)
+    # -------------------------
+    daily[f"fatiga_cronica_{ventana_cronica}d"] = (
+        daily["ua_diaria"]
+        .rolling(window=ventana_cronica, min_periods=1)
+        .mean()
+    )
+
+    # -------------------------
+    # Recuperación (Xd)
+    # -------------------------
+    daily[f"recuperacion_{ventana_cronica}d"] = (
+        daily[f"fatiga_cronica_{ventana_cronica}d"]
+        - daily["fatiga_aguda_7d"]
+    )
+
+    # -------------------------
+    # ACWR (Xd)
+    # -------------------------
+    daily[f"acwr_{ventana_cronica}d"] = (
+        daily["fatiga_aguda_7d"]
+        / daily[f"fatiga_cronica_{ventana_cronica}d"]
+    )
+
+    columnas_numericas = daily.select_dtypes(include="number").columns
+    daily[columnas_numericas] = daily[columnas_numericas].round(2)
+
+    return daily.reset_index()
