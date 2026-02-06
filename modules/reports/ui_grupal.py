@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 from modules.i18n.i18n import t
-from modules.reports.metrics import RPEFilters, compute_rpe_metrics
+from modules.reports.metrics import RPEFilters, _ema, compute_rpe_metrics
 from .plots_grupales import (plot_carga_semanal, plot_estado_carga_grupal, plot_rpe_promedio, tabla_resumen)
 
 def group_dashboard(df_filtrado: pd.DataFrame):
@@ -201,6 +201,87 @@ def aggregate_group_metrics(df_players: pd.DataFrame) -> dict:
 # 📈 Estado de Carga
 # ============================================================
 
+# def compute_rpe_timeseries_group(
+#     df: pd.DataFrame,
+#     ventana_aguda: int = 7,
+#     ventana_cronica: int = 42,
+# ) -> pd.DataFrame:
+#     """
+#     Calcula el estado de carga diario A NIVEL GRUPAL.
+
+#     Devuelve un DataFrame con:
+#     - UA diaria grupal (suma)
+#     - Fatiga aguda (media móvil)
+#     - Fatiga crónica (media móvil)
+#     - Recuperación
+#     - ACWR
+#     """
+
+#     if df is None or df.empty:
+#         return pd.DataFrame()
+
+#     df = df.copy()
+
+#     # -------------------------
+#     # Fecha
+#     # -------------------------
+#     df["fecha_sesion"] = pd.to_datetime(df["fecha_sesion"], errors="coerce")
+#     df = df.dropna(subset=["fecha_sesion"])
+
+#     # -------------------------
+#     # UA diaria grupal (SUMA)
+#     # -------------------------
+#     daily = (
+#         df.groupby("fecha_sesion", as_index=False)["ua"]
+#         .sum()
+#         .rename(columns={"ua": "ua_grupal"})
+#         .set_index("fecha_sesion")
+#         .asfreq("D")
+#     )
+
+#     daily["ua_grupal"] = daily["ua_grupal"].fillna(0)
+
+#     # -------------------------
+#     # Fatiga aguda (7d)
+#     # -------------------------
+#     daily["fatiga_aguda_7d"] = (
+#         daily["ua_grupal"]
+#         .rolling(window=ventana_aguda, min_periods=1)
+#         .mean()
+#     )
+
+#     # -------------------------
+#     # Fatiga crónica (Xd)
+#     # -------------------------
+#     col_cronica = f"fatiga_cronica_{ventana_cronica}d"
+#     daily[col_cronica] = (
+#         daily["ua_grupal"]
+#         .rolling(window=ventana_cronica, min_periods=1)
+#         .mean()
+#     )
+
+#     # -------------------------
+#     # Recuperación
+#     # -------------------------
+#     daily[f"recuperacion_{ventana_cronica}d"] = (
+#         daily[col_cronica] - daily["fatiga_aguda_7d"]
+#     )
+
+#     # -------------------------
+#     # ACWR
+#     # -------------------------
+#     daily[f"acwr_{ventana_cronica}d"] = (
+#         daily["fatiga_aguda_7d"] / daily[col_cronica]
+#     )
+
+#     # -------------------------
+#     # Redondeo
+#     # -------------------------
+#     num_cols = daily.select_dtypes("number").columns
+#     daily[num_cols] = daily[num_cols].round(2)
+
+#     return daily.reset_index()
+
 def compute_rpe_timeseries_group(
     df: pd.DataFrame,
     ventana_aguda: int = 7,
@@ -210,11 +291,13 @@ def compute_rpe_timeseries_group(
     Calcula el estado de carga diario A NIVEL GRUPAL.
 
     Devuelve un DataFrame con:
-    - UA diaria grupal (suma)
-    - Fatiga aguda (media móvil)
-    - Fatiga crónica (media móvil)
-    - Recuperación
-    - ACWR
+    - UA diaria grupal
+    - Fatiga aguda (SMA y EMA)
+    - Fatiga crónica (SMA y EMA)
+    - Recuperación (SMA y EMA)
+    - ACWR (SMA y EMA)
+
+    Todas las métricas están en UA/día y son graficables.
     """
 
     if df is None or df.empty:
@@ -241,43 +324,60 @@ def compute_rpe_timeseries_group(
 
     daily["ua_grupal"] = daily["ua_grupal"].fillna(0)
 
-    # -------------------------
-    # Fatiga aguda (7d)
-    # -------------------------
-    daily["fatiga_aguda_7d"] = (
+    # =====================================================
+    # MODELO SMA (MEDIA MÓVIL)
+    # =====================================================
+    daily[f"fatiga_aguda_{ventana_aguda}d_sma"] = (
         daily["ua_grupal"]
         .rolling(window=ventana_aguda, min_periods=1)
         .mean()
     )
 
-    # -------------------------
-    # Fatiga crónica (Xd)
-    # -------------------------
-    col_cronica = f"fatiga_cronica_{ventana_cronica}d"
-    daily[col_cronica] = (
+    daily[f"fatiga_cronica_{ventana_cronica}d_sma"] = (
         daily["ua_grupal"]
         .rolling(window=ventana_cronica, min_periods=1)
         .mean()
     )
 
-    # -------------------------
-    # Recuperación
-    # -------------------------
-    daily[f"recuperacion_{ventana_cronica}d"] = (
-        daily[col_cronica] - daily["fatiga_aguda_7d"]
+    daily[f"recuperacion_{ventana_cronica}d_sma"] = (
+        daily[f"fatiga_cronica_{ventana_cronica}d_sma"]
+        - daily[f"fatiga_aguda_{ventana_aguda}d_sma"]
     )
 
-    # -------------------------
-    # ACWR
-    # -------------------------
-    daily[f"acwr_{ventana_cronica}d"] = (
-        daily["fatiga_aguda_7d"] / daily[col_cronica]
+    daily[f"acwr_{ventana_cronica}d_sma"] = (
+        daily[f"fatiga_aguda_{ventana_aguda}d_sma"]
+        / daily[f"fatiga_cronica_{ventana_cronica}d_sma"]
+    )
+
+    # =====================================================
+    # MODELO EMA (EXCEL / BANISTER)
+    # =====================================================
+    # 🔴 Agudo
+    daily[f"fatiga_aguda_{ventana_aguda}d_ema"] = _ema(
+        daily["ua_grupal"],
+        ventana_aguda
+    )
+
+    # 🔵 Crónico
+    daily[f"fatiga_cronica_{ventana_cronica}d_ema"] = _ema(
+        daily["ua_grupal"],
+        ventana_cronica
+    )
+
+    daily[f"recuperacion_{ventana_cronica}d_ema"] = (
+        daily[f"fatiga_cronica_{ventana_cronica}d_ema"]
+        - daily[f"fatiga_aguda_{ventana_aguda}d_ema"]
+    )
+
+    daily[f"acwr_{ventana_cronica}d_ema"] = (
+        daily[f"fatiga_aguda_{ventana_aguda}d_ema"]
+        / daily[f"fatiga_cronica_{ventana_cronica}d_ema"]
     )
 
     # -------------------------
     # Redondeo
     # -------------------------
-    num_cols = daily.select_dtypes("number").columns
+    num_cols = daily.select_dtypes(include="number").columns
     daily[num_cols] = daily[num_cols].round(2)
 
     return daily.reset_index()

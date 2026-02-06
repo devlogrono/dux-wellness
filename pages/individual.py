@@ -30,8 +30,6 @@ if df_filtrado is None or df_filtrado.empty:
 
 player_block_dux(jugadora)
 
-#st.dataframe(df_filtrado, hide_index=True)
-
 metricas(df_filtrado, jugadora, turno, start, end)
 
 icon, desc, acwr, fatiga = calcular_semaforo_riesgo(df_filtrado)
