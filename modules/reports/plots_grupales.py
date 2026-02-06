@@ -246,11 +246,11 @@ def plot_estado_carga_grupal(
         st.info(t("No hay datos suficientes para el estado de carga grupal."))
         return
 
-    col_cronica = f"fatiga_cronica_{ventana_cronica}d"
-    col_recup = f"recuperacion_{ventana_cronica}d"
+    col_cronica = f"fatiga_cronica_{ventana_cronica}d_ema"
+    col_recup = f"recuperacion_{ventana_cronica}d_ema"
 
     # Validación mínima de columnas
-    required = {"fecha_sesion", "ua_grupal", "fatiga_aguda_7d", col_cronica}
+    required = {"fecha_sesion", "ua_grupal", "fatiga_aguda_7d_ema", col_cronica}
     missing = required - set(df.columns)
     if missing:
         st.info(t("Faltan columnas para graficar el estado de carga grupal."))
@@ -264,16 +264,17 @@ def plot_estado_carga_grupal(
         x=df["fecha_sesion"],
         y=df["ua_grupal"],
         name=t("UA diaria grupal"),
-        opacity=0.6
+        #opacity=0.6,
+        marker_color="rgba(150,150,150,0.4)"
     ))
 
     # Fatiga aguda (7d)
     fig.add_trace(go.Scatter(
         x=df["fecha_sesion"],
-        y=df["fatiga_aguda_7d"],
+        y=df["fatiga_aguda_7d_ema"],
         name=t("Fatiga aguda (7d)"),
         mode="lines",
-        line=dict(width=2)
+        line=dict(color="#E53935", width=2)
     ))
 
     # Fatiga crónica (ventana)
@@ -282,7 +283,7 @@ def plot_estado_carga_grupal(
         y=df[col_cronica],
         name=t(f"Fatiga crónica ({ventana_cronica}d)"),
         mode="lines",
-        line=dict(width=2)
+        line=dict(color="#1E88E5", width=2)
     ))
 
     # ✅ Recuperación (ventana) – solo si existe
@@ -292,7 +293,7 @@ def plot_estado_carga_grupal(
             y=df[col_recup],
             name=t(f"Recuperación"),
             mode="lines",
-            line=dict(width=2, dash="dot")
+            line=dict(color="#43A047", width=2, dash="dot")
         ))
     else:
         st.caption(t(f"No se encontró la columna {col_recup}. No se grafica recuperación."))

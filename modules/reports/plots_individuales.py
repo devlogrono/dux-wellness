@@ -133,7 +133,7 @@ def grafico_acwr(
     (compute_rpe_timeseries).
     """
 
-    col_acwr = f"acwr_{ventana_cronica}d"
+    col_acwr = f"acwr_{ventana_cronica}d_ema"
 
     if df_states.empty or col_acwr not in df_states.columns:
         st.info(t("No hay datos suficientes para mostrar el ACWR."))
@@ -562,6 +562,7 @@ def plot_carga_fatiga_recuperacion(df_states: pd.DataFrame, ventana_cronica: int
         x=df_states["fecha_sesion"],
         y=df_states["ua_diaria"],
         name="Carga diaria (UA)",
+        #opacity=0.6
         marker_color="rgba(150,150,150,0.4)",
     )
 
@@ -569,7 +570,7 @@ def plot_carga_fatiga_recuperacion(df_states: pd.DataFrame, ventana_cronica: int
     fig.add_trace(
         go.Scatter(
             x=df_states["fecha_sesion"],
-            y=df_states["fatiga_aguda_7d"],
+            y=df_states["fatiga_aguda_7d_ema"],
             mode="lines",
             name="Fatiga aguda (7d)",
             line=dict(color="#E53935", width=2),
@@ -580,7 +581,7 @@ def plot_carga_fatiga_recuperacion(df_states: pd.DataFrame, ventana_cronica: int
     fig.add_trace(
         go.Scatter(
             x=df_states["fecha_sesion"],
-            y=df_states[f"fatiga_cronica_{ventana_cronica}d"],
+            y=df_states[f"fatiga_cronica_{ventana_cronica}d_ema"],
             mode="lines",
             name=f"Fatiga crónica ({ventana_cronica}d)",
             line=dict(color="#1E88E5", width=2),
@@ -591,7 +592,7 @@ def plot_carga_fatiga_recuperacion(df_states: pd.DataFrame, ventana_cronica: int
     fig.add_trace(
         go.Scatter(
             x=df_states["fecha_sesion"],
-            y=df_states[f"recuperacion_{ventana_cronica}d"],
+            y=df_states[f"recuperacion_{ventana_cronica}d_ema"],
             mode="lines",
             name=f"Recuperación",
             line=dict(color="#43A047", width=2, dash="dot"),

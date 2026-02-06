@@ -309,13 +309,13 @@ def graficos_individuales(df: pd.DataFrame):
         t("Wellness + Lesiones")
     ])
 
-
     with tabs[0]: 
         tabla_wellness_individual(df_player)
         st.divider()
         grafico_wellness(df_player)
     with tabs[1]: 
         df_states = compute_rpe_timeseries(df_player)
+        #st.dataframe(df_states)
         plot_carga_fatiga_recuperacion(df_states)
     with tabs[2]: 
         #grafico_acwr(df_player)
@@ -332,7 +332,6 @@ def graficos_individuales(df: pd.DataFrame):
             #st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No hay registros de lesiones.")
-
 
 def selector_ventana_cronica():
     # -------------------------

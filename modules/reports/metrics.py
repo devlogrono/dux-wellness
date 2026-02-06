@@ -240,7 +240,93 @@ def compute_rpe_metrics(df_raw: pd.DataFrame, flt: RPEFilters) -> dict:
     res["minutos_sesion"] = float(day_row["minutos_total"].iloc[0]) if not day_row.empty else 0.0
     return res
 
-import pandas as pd
+# def compute_rpe_timeseries(
+#     df: pd.DataFrame,
+#     ventana_aguda: int = 7,
+#     ventana_cronica: int = 42,
+# ) -> pd.DataFrame:
+#     """
+#     Genera un DataFrame diario continuo con estados de carga interna:
+#     - UA diaria
+#     - Fatiga aguda (media móvil, UA/día)
+#     - Fatiga crónica (media móvil, UA/día)
+#     - Recuperación (crónica - aguda)
+#     - ACWR
+
+#     Todas las métricas están en UA/día y son graficables.
+#     """
+
+#     if df is None or df.empty:
+#         return pd.DataFrame()
+
+#     df = df.copy()
+
+#     # -------------------------
+#     # Asegurar fecha
+#     # -------------------------
+#     df["fecha_sesion"] = pd.to_datetime(df["fecha_sesion"], errors="coerce")
+#     df = df.dropna(subset=["fecha_sesion"])
+
+#     # -------------------------
+#     # UA diaria (suma por día)
+#     # -------------------------
+#     daily = (
+#         df.groupby("fecha_sesion", as_index=False)["ua"]
+#         .sum()
+#         .rename(columns={"ua": "ua_diaria"})
+#         .set_index("fecha_sesion")
+#         .asfreq("D")
+#     )
+
+#     # Días sin sesión = 0 UA
+#     daily["ua_diaria"] = daily["ua_diaria"].fillna(0)
+
+#     # -------------------------
+#     # Fatiga aguda (7d)
+#     # -------------------------
+#     daily["fatiga_aguda_7d"] = (
+#         daily["ua_diaria"]
+#         .rolling(window=ventana_aguda, min_periods=1)
+#         .mean()
+#     )
+
+#     # -------------------------
+#     # Fatiga crónica (Xd)
+#     # -------------------------
+#     daily[f"fatiga_cronica_{ventana_cronica}d"] = (
+#         daily["ua_diaria"]
+#         .rolling(window=ventana_cronica, min_periods=1)
+#         .mean()
+#     )
+
+#     # -------------------------
+#     # Recuperación (Xd)
+#     # -------------------------
+#     daily[f"recuperacion_{ventana_cronica}d"] = (
+#         daily[f"fatiga_cronica_{ventana_cronica}d"]
+#         - daily["fatiga_aguda_7d"]
+#     )
+
+#     # -------------------------
+#     # ACWR (Xd)
+#     # -------------------------
+#     daily[f"acwr_{ventana_cronica}d"] = (
+#         daily["fatiga_aguda_7d"]
+#         / daily[f"fatiga_cronica_{ventana_cronica}d"]
+#     )
+
+#     columnas_numericas = daily.select_dtypes(include="number").columns
+#     daily[columnas_numericas] = daily[columnas_numericas].round(2)
+
+#     return daily.reset_index()
+
+def _ema(series: pd.Series, tau: int) -> pd.Series:
+    """
+    Exponential Moving Average equivalente al Excel (modelo Banister).
+    tau = constante de tiempo (7, 28, 42, 56…)
+    """
+    alpha = 1 - np.exp(-1 / tau)
+    return series.ewm(alpha=alpha, adjust=False).mean()
 
 def compute_rpe_timeseries(
     df: pd.DataFrame,
@@ -248,14 +334,10 @@ def compute_rpe_timeseries(
     ventana_cronica: int = 42,
 ) -> pd.DataFrame:
     """
-    Genera un DataFrame diario continuo con estados de carga interna:
-    - UA diaria
-    - Fatiga aguda (media móvil, UA/día)
-    - Fatiga crónica (media móvil, UA/día)
-    - Recuperación (crónica - aguda)
-    - ACWR
-
-    Todas las métricas están en UA/día y son graficables.
+    Genera un DataFrame diario continuo con estados de carga interna.
+    Incluye:
+    - SMA (media móvil)
+    - EMA (modelo Banister / Excel)
     """
 
     if df is None or df.empty:
@@ -264,13 +346,13 @@ def compute_rpe_timeseries(
     df = df.copy()
 
     # -------------------------
-    # Asegurar fecha
+    # Fecha
     # -------------------------
     df["fecha_sesion"] = pd.to_datetime(df["fecha_sesion"], errors="coerce")
     df = df.dropna(subset=["fecha_sesion"])
 
     # -------------------------
-    # UA diaria (suma por día)
+    # UA diaria
     # -------------------------
     daily = (
         df.groupby("fecha_sesion", as_index=False)["ua"]
@@ -280,44 +362,62 @@ def compute_rpe_timeseries(
         .asfreq("D")
     )
 
-    # Días sin sesión = 0 UA
     daily["ua_diaria"] = daily["ua_diaria"].fillna(0)
 
-    # -------------------------
-    # Fatiga aguda (7d)
-    # -------------------------
-    daily["fatiga_aguda_7d"] = (
+    # =====================================================
+    # SMA (media móvil)
+    # =====================================================
+    daily[f"fatiga_aguda_{ventana_aguda}d_sma"] = (
         daily["ua_diaria"]
         .rolling(window=ventana_aguda, min_periods=1)
         .mean()
     )
 
-    # -------------------------
-    # Fatiga crónica (Xd)
-    # -------------------------
-    daily[f"fatiga_cronica_{ventana_cronica}d"] = (
+    daily[f"fatiga_cronica_{ventana_cronica}d_sma"] = (
         daily["ua_diaria"]
         .rolling(window=ventana_cronica, min_periods=1)
         .mean()
     )
 
-    # -------------------------
-    # Recuperación (Xd)
-    # -------------------------
-    daily[f"recuperacion_{ventana_cronica}d"] = (
-        daily[f"fatiga_cronica_{ventana_cronica}d"]
-        - daily["fatiga_aguda_7d"]
+    daily[f"recuperacion_{ventana_cronica}d_sma"] = (
+        daily[f"fatiga_cronica_{ventana_cronica}d_sma"]
+        - daily[f"fatiga_aguda_{ventana_aguda}d_sma"]
+    )
+
+    daily[f"acwr_{ventana_cronica}d_sma"] = (
+        daily[f"fatiga_aguda_{ventana_aguda}d_sma"]
+        / daily[f"fatiga_cronica_{ventana_cronica}d_sma"]
+    )
+
+    # =====================================================
+    # EMA (Excel / Banister)
+    # =====================================================
+    # 🔴 Agudo → τ = ventana_aguda
+    daily[f"fatiga_aguda_{ventana_aguda}d_ema"] = _ema(
+        daily["ua_diaria"],
+        ventana_aguda
+    )
+
+    # 🔵 Crónico → τ = ventana_cronica
+    daily[f"fatiga_cronica_{ventana_cronica}d_ema"] = _ema(
+        daily["ua_diaria"],
+        ventana_cronica
+    )
+
+    daily[f"recuperacion_{ventana_cronica}d_ema"] = (
+        daily[f"fatiga_cronica_{ventana_cronica}d_ema"]
+        - daily[f"fatiga_aguda_{ventana_aguda}d_ema"]
+    )
+
+    daily[f"acwr_{ventana_cronica}d_ema"] = (
+        daily[f"fatiga_aguda_{ventana_aguda}d_ema"]
+        / daily[f"fatiga_cronica_{ventana_cronica}d_ema"]
     )
 
     # -------------------------
-    # ACWR (Xd)
+    # Redondeo
     # -------------------------
-    daily[f"acwr_{ventana_cronica}d"] = (
-        daily["fatiga_aguda_7d"]
-        / daily[f"fatiga_cronica_{ventana_cronica}d"]
-    )
-
-    columnas_numericas = daily.select_dtypes(include="number").columns
-    daily[columnas_numericas] = daily[columnas_numericas].round(2)
+    num_cols = daily.select_dtypes(include="number").columns
+    daily[num_cols] = daily[num_cols].round(2)
 
     return daily.reset_index()
