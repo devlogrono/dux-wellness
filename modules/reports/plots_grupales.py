@@ -305,7 +305,7 @@ def plot_estado_carga_grupal(
         barmode="overlay",
         plot_bgcolor="white",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        height=420
+        #height=420
     )
 
     st.plotly_chart(fig, use_container_width=False)
