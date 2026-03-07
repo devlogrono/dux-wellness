@@ -4,7 +4,7 @@ import json
 import streamlit as st
 from modules.db.db_client import query
 from modules.db.db_catalogs import load_catalog_list_db
-from modules.db.db_util import build_user_access_filter
+from modules.db.db_utils import build_user_access_filter
 
 def get_wellness_pre_lesion(
     id_jugadora: str | None = None,

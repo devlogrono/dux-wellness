@@ -5,7 +5,7 @@ import datetime
 
 from modules.db.db_catalogs import load_catalog_list_db
 from modules.db.db_client import query, execute
-from modules.db.db_util import build_user_access_filter
+from modules.db.db_utils import build_user_access_filter
 
 def get_records_db(as_df: bool = True):
     """
