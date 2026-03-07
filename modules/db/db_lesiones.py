@@ -4,50 +4,44 @@ import json
 import streamlit as st
 from modules.db.db_client import query
 from modules.db.db_catalogs import load_catalog_list_db
+from modules.db.db_util import build_user_access_filter
 
 def get_wellness_pre_lesion(
     id_jugadora: str | None = None,
     dias_previos: int = 14,
+    estatus_lesion: str = "ACTIVO",
     as_df: bool = True,
 ):
-    """
-    Obtiene registros de wellness previos a lesiones ACTIVAS u OBSERVACION.
 
-    - Usa fecha_lesion como punto de corte
-    - Ventana configurable (default: 14 días)
-    - Puede devolver datos de todas las jugadoras o de una específica
-    """
-
-    # ----------------------------
-    # Catálogo zonas anatómicas
-    # ----------------------------
     zonas_df = load_catalog_list_db("zonas_anatomicas", as_df=True)
     map_zonas = dict(zip(zonas_df["id"], zonas_df["nombre"]))
 
     # ----------------------------
-    # Filtro opcional por jugadora
+    # Filtros dinámicos
     # ----------------------------
     jugadora_filter = ""
-    username = st.session_state["auth"]["username"].lower()
-    rol = st.session_state["auth"]["rol"].lower()
     params = {
+        "estatus": estatus_lesion,
         "dias": dias_previos,
-        "usuario": username,
     }
 
     if id_jugadora:
         jugadora_filter = "AND l.id_jugadora = %(id_jugadora)s"
         params["id_jugadora"] = id_jugadora
 
-    # Si el rol es developer o admin, ve todo
-    usuario_filter = ""
-    if rol != "developer" and rol != "admin":
-        usuario_filter = """
-            AND l.usuario = %(usuario)s
-            AND w.usuario = %(usuario)s
-        """
     # ----------------------------
-    # Query CORREGIDA
+    # Control de acceso reutilizable
+    # ----------------------------
+    l_filter, l_params = build_user_access_filter("l")
+    w_filter, w_params = build_user_access_filter("w")
+
+    usuario_filter = f"""
+        AND {l_filter}
+        AND {w_filter}
+    """
+
+    # ----------------------------
+    # Query
     # ----------------------------
     sql = f"""
         SELECT
@@ -89,15 +83,14 @@ def get_wellness_pre_lesion(
            AND w.estatus_id <= 2
 
         WHERE l.deleted_at IS NULL
-          AND l.estado_lesion IN ('ACTIVO', 'OBSERVACION')
-          {jugadora_filter} {usuario_filter}
+          AND l.estado_lesion = %(estatus)s
+          {jugadora_filter}
+          {usuario_filter}
 
-        ORDER BY l.id_jugadora, l.fecha_lesion, w.fecha_sesion;
+        ORDER BY l.id_jugadora, l.fecha_lesion, w.fecha_sesion
     """
 
-    #st.text(sql)
-    #st.text(params)
-    rows = query(sql, params)
+    rows = query(sql, {**params, **dict(zip(["l_user", "w_user"], (*l_params, *w_params)))})
 
     if not rows:
         return pd.DataFrame() if as_df else []
@@ -117,9 +110,6 @@ def get_wellness_pre_lesion(
         lambda ids: [map_zonas.get(i, f"ID {i}") for i in ids]
     )
 
-    # ----------------------------
-    # Normalizar fechas
-    # ----------------------------
     df["fecha_sesion"] = pd.to_datetime(df["fecha_sesion"], errors="coerce").dt.date
     df["fecha_lesion"] = pd.to_datetime(df["fecha_lesion"], errors="coerce").dt.date
 
