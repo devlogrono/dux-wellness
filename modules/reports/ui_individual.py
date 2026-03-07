@@ -325,6 +325,7 @@ def graficos_individuales(df: pd.DataFrame):
     with tabs[4]: 
         grafico_duracion_rpe(df_player)
     with tabs[5]: 
+        #st.text("hola")
         id_jugadora = df_player["id_jugadora"].iloc[0]
         pre_lesion = get_wellness_pre_lesion(id_jugadora=id_jugadora, dias_previos=14, as_df=True)
         if not pre_lesion.empty: 

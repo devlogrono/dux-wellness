@@ -28,20 +28,20 @@ def get_wellness_pre_lesion(
     # Filtro opcional por jugadora
     # ----------------------------
     jugadora_filter = ""
+    username = st.session_state["auth"]["username"].lower()
     rol = st.session_state["auth"]["rol"].lower()
     params = {
         "dias": dias_previos,
-        "usuario": rol,
+        "usuario": username,
     }
 
     if id_jugadora:
         jugadora_filter = "AND l.id_jugadora = %(id_jugadora)s"
         params["id_jugadora"] = id_jugadora
 
-    # Si el rol es developer, ve todo
-    
+    # Si el rol es developer o admin, ve todo
     usuario_filter = ""
-    if rol != "developer":
+    if rol != "developer" and rol != "admin":
         usuario_filter = """
             AND l.usuario = %(usuario)s
             AND w.usuario = %(usuario)s
@@ -95,6 +95,8 @@ def get_wellness_pre_lesion(
         ORDER BY l.id_jugadora, l.fecha_lesion, w.fecha_sesion;
     """
 
+    #st.text(sql)
+    #st.text(params)
     rows = query(sql, params)
 
     if not rows:
