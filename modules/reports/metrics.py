@@ -6,7 +6,7 @@ from datetime import date, timedelta
 import numpy as np
 import pandas as pd
 from typing import Optional
-import streamlit as st
+import streamlit as st 
 
 @dataclass
 class RPEFilters:
@@ -16,45 +16,85 @@ class RPEFilters:
     end: Optional[date] = None
 
 def _prepare_checkout_df(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Deja preparado el dataset para métricas de carga:
+    - solo registros checkout
+    - tipo normalizado
+    - ua y minutos_sesion numéricos
+    - fecha_sesion como date
+    """
     if df is None or df.empty:
         return pd.DataFrame()
+
     out = df.copy()
-    # Keep only checkOut with UA available
+    # -------------------------
+    # Normalizar tipo
+    # -------------------------
     if "tipo" in out.columns:
-        out = out[out["tipo"] == "checkOut"]
-    # Ensure UA numeric
+        out["tipo"] = out["tipo"].astype(str).str.strip().str.lower()
+        out = out[out["tipo"] == "checkout"]
+    # -------------------------
+    # Asegurar UA numérica
+    # -------------------------
     if "ua" in out.columns:
         out["ua"] = pd.to_numeric(out["ua"], errors="coerce")
     else:
         out["ua"] = np.nan
-    # Ensure fecha_dia exists
-    if "fecha" in out.columns and "fecha_sesion" not in out.columns:
+    # -------------------------
+    # Asegurar minutos numéricos
+    # -------------------------
+    if "minutos_sesion" in out.columns:
+        out["minutos_sesion"] = pd.to_numeric(out["minutos_sesion"], errors="coerce")
+    else:
+        out["minutos_sesion"] = 0
+    # -------------------------
+    # Asegurar fecha_sesion
+    # -------------------------
+    if "fecha_sesion" in out.columns:
         out["fecha_sesion"] = pd.to_datetime(out["fecha_sesion"], errors="coerce").dt.date
-    return out.dropna(subset=["fecha_sesion", "ua"])
+    else:
+        out["fecha_sesion"] = pd.NaT
+    # -------------------------
+    # Limpiar filas inválidas
+    # -------------------------
+    out = out.dropna(subset=["fecha_sesion", "ua"]).copy()
+
+    return out
 
 def _daily_loads(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calcula las cargas diarias sumando UA (RPE × minutos) y minutos de sesión
-    por fecha_sesion. Devuelve un DataFrame con ambas métricas.
+    Calcula la carga diaria y devuelve una serie continua por días.
+    Los días sin sesión se rellenan con 0.
     """
     if df.empty:
         return pd.DataFrame(columns=["fecha_sesion", "ua_total", "minutos_total"])
 
-    # --- asegurar columnas necesarias ---
-    if "ua" not in df.columns:
-        df["ua"] = 0
-    if "minutos_sesion" not in df.columns:
-        df["minutos_sesion"] = 0
+    out = df.copy()
 
-    # --- agrupar ---
-    grp = (
-        df.groupby("fecha_sesion", as_index=False)[["ua", "minutos_sesion"]]
-        .sum(min_count=1)  # evita NaN si todos son NaN
+    if "ua" not in out.columns:
+        out["ua"] = 0
+    if "minutos_sesion" not in out.columns:
+        out["minutos_sesion"] = 0
+
+    daily = (
+        out.groupby("fecha_sesion", as_index=False)[["ua", "minutos_sesion"]]
+        .sum(min_count=1)
         .rename(columns={"ua": "ua_total", "minutos_sesion": "minutos_total"})
         .sort_values("fecha_sesion")
     )
 
-    return grp
+    daily["fecha_sesion"] = pd.to_datetime(daily["fecha_sesion"], errors="coerce")
+
+    daily = (
+        daily.set_index("fecha_sesion")
+        .asfreq("D")
+        .fillna({"ua_total": 0, "minutos_total": 0})
+        .reset_index()
+    )
+
+    daily["fecha_sesion"] = daily["fecha_sesion"].dt.date
+
+    return daily
 
 def _current_week_range(end_day: date) -> tuple[date, date]:
     # Monday to Sunday containing end_day
@@ -74,46 +114,58 @@ def _month_range(end_day: date) -> tuple[date, date]:
 
 def _chronic_load(daily: pd.DataFrame, end_day: date, days: int) -> float:
     """
-    Calcula carga crónica como media de UA diarios
+    Calcula carga crónica como media diaria de UA
     en una ventana de 'days' días naturales.
-    Solo promedia días con sesión registrada.
+    La serie diaria ya incluye días sin sesión como 0.
     """
     start = end_day - timedelta(days=days - 1)
+
     window = daily[
         (daily["fecha_sesion"] >= start) &
         (daily["fecha_sesion"] <= end_day)
-    ]
+    ].copy()
+
     return float(window["ua_total"].mean()) if not window.empty else 0.0
 
 def compute_rpe_metrics(df_raw: pd.DataFrame, flt: RPEFilters) -> dict:
+    """
+    Calcula métricas de carga interna a partir de registros checkout.
+
+    Lógica:
+    - carga_total_periodo / carga_media_periodo -> dependen del rango seleccionado
+    - fatiga aguda -> siempre 7 días
+    - fatiga crónica -> siempre 28 / 42 / 56 días
+    - días sin carga dentro de cada ventana cuentan como 0
+    """
     df = _prepare_checkout_df(df_raw)
-    #st.dataframe(df)
-    
-    #df = _apply_filters(df, flt)
-    
+
     res: dict = {
-        "ua_total_dia": None,
-        "minutos_sesion": None,
-        "carga_semana": None,
-        "carga_mes": None,
-        "carga_media_semana": None,
-        "carga_media_mes": None,
+        "ua_total_dia": 0.0,
+        "minutos_sesion": 0.0,
+
+        # dinámicas según rango seleccionado
+        "carga_total_periodo": 0.0,
+        "carga_media_periodo": 0.0,
+
+        # compatibilidad
+        "carga_semana": 0.0,
+        "carga_mes": 0.0,
+        "carga_media_semana": 0.0,
+        "carga_media_mes": 0.0,
+
         "monotonia_semana": None,
-        "fatiga_aguda": None,
-        "fatiga_aguda_diaria": None,
-        "fatiga_cronica_28d": None,
-        "fatiga_cronica_42d": None,
-        "fatiga_cronica_56d": None,
-        "adaptacion_28d": None,
-        "adaptacion_42d": None,
-        "adaptacion_56d": None,
+        "variabilidad_semana": 0.0,
+        "fatiga_aguda": 0.0,
+        "fatiga_aguda_7d_media": 0.0,
+        "fatiga_cronica_28d": 0.0,
+        "fatiga_cronica_42d": 0.0,
+        "fatiga_cronica_56d": 0.0,
+        "estado_forma_28d": None,
+        "estado_forma_42d": None,
+        "estado_forma_56d": None,
         "acwr_28d": None,
         "acwr_42d": None,
         "acwr_56d": None,
-        "recuperacion_28d": None,
-        "recuperacion_42d": None,
-        "recuperacion_56d": None,
-        "variabilidad_semana": None,
         "daily_table": pd.DataFrame(),
     }
 
@@ -121,123 +173,125 @@ def compute_rpe_metrics(df_raw: pd.DataFrame, flt: RPEFilters) -> dict:
         return res
 
     daily = _daily_loads(df)
-    
-    res["daily_table"] = daily
+    if daily.empty:
+        return res
 
-    # Determine reference end date
-    end_day = flt.end or daily["fecha_sesion"].max()
+    daily_dt = daily.copy()
+    daily_dt["fecha_sesion"] = pd.to_datetime(daily_dt["fecha_sesion"], errors="coerce")
+    daily_dt = daily_dt.dropna(subset=["fecha_sesion"]).sort_values("fecha_sesion")
 
-    # Week metrics (use the week containing end_day)
-    week_start, week_end = _current_week_range(end_day)
-    daily_week = daily[(daily["fecha_sesion"] >= week_start) & (daily["fecha_sesion"] <= week_end)]
-    semana_sum = daily_week["ua_total"].sum() if not daily_week.empty else 0.0
-    semana_mean = daily_week["ua_total"].mean() if not daily_week.empty else 0.0
-    semana_std = daily_week["ua_total"].std(ddof=0) if len(daily_week) > 1 else 0.0
-    res["carga_semana"] = float(semana_sum)
-    res["carga_media_semana"] = float(semana_mean)
-    res["monotonia_semana"] = float(semana_mean / semana_std) if semana_std and semana_std > 0 else None
-    res["variabilidad_semana"] = float(semana_std) if semana_std is not None else None
+    if daily_dt.empty:
+        return res
 
-    # st.dataframe(daily)
-    # st.dataframe(daily_week)
+    res["daily_table"] = daily.copy()
 
-    # Day metric (exact end_day)
-    day_row = daily[daily["fecha_sesion"] == end_day]
-    #st.dataframe(day_row)
+    # =========================
+    # Fechas de referencia
+    # =========================
+    end_day = flt.end or daily_dt["fecha_sesion"].dt.date.max()
+    start_periodo = flt.start or daily_dt["fecha_sesion"].dt.date.min()
+    end_periodo = flt.end or daily_dt["fecha_sesion"].dt.date.max()
+
+    # =========================
+    # Auxiliar: ventana general con ceros
+    # =========================
+    def _build_window(start_day: date, end_day_window: date) -> pd.DataFrame:
+        idx = pd.date_range(
+            start=pd.to_datetime(start_day),
+            end=pd.to_datetime(end_day_window),
+            freq="D"
+        )
+
+        window = (
+            daily_dt.set_index("fecha_sesion")[["ua_total", "minutos_total"]]
+            .reindex(idx, fill_value=0)
+            .rename_axis("fecha_sesion")
+            .reset_index()
+        )
+
+        window["fecha_sesion"] = window["fecha_sesion"].dt.date
+        return window
+
+    # =========================
+    # Periodo seleccionado (dinámico)
+    # =========================
+    daily_period = _build_window(start_periodo, end_periodo)
+    res["carga_total_periodo"] = float(daily_period["ua_total"].sum())
+    res["carga_media_periodo"] = float(daily_period["ua_total"].mean()) if not daily_period.empty else 0.0
+
+    # =========================
+    # Ventana 7 días fija
+    # =========================
+    daily_last7 = _build_window(end_day - timedelta(days=6), end_day)
+
+    semana_sum = float(daily_last7["ua_total"].sum())
+    semana_mean = float(daily_last7["ua_total"].mean())
+    semana_std = float(daily_last7["ua_total"].std(ddof=0)) if len(daily_last7) > 1 else 0.0
+
+    res["carga_semana"] = semana_sum
+    res["carga_media_semana"] = semana_mean
+    res["monotonia_semana"] = float(semana_mean / semana_std) if semana_std > 0 else None
+    res["variabilidad_semana"] = semana_std
+
+    # =========================
+    # Métrica diaria exacta del end_day
+    # =========================
+    day_row = daily_last7[daily_last7["fecha_sesion"] == end_day]
     res["ua_total_dia"] = float(day_row["ua_total"].iloc[0]) if not day_row.empty else 0.0
-    #st.dataframe(res)
-    # Month metrics (calendar month of end_day)
-    m_start, m_end = _month_range(end_day)
-    daily_month = daily[(daily["fecha_sesion"] >= m_start) & (daily["fecha_sesion"] <= m_end)]
-    mes_sum = daily_month["ua_total"].sum() if not daily_month.empty else 0.0
-    mes_mean = daily_month["ua_total"].mean() if not daily_month.empty else 0.0
-    res["carga_mes"] = float(mes_sum)
-    res["carga_media_mes"] = float(mes_mean)
-
-    # Acute/Chronic fatigue and derived indices
-    # Acute = sum last 7 days ending at end_day
-    last7_start = end_day - timedelta(days=6)
-    daily_last7 = daily[(daily["fecha_sesion"] >= last7_start) & (daily["fecha_sesion"] <= end_day)]
-    fatiga_aguda = daily_last7["ua_total"].sum() if not daily_last7.empty else 0.0
-    res["fatiga_aguda"] = float(fatiga_aguda)
-
-    # Chronic = average daily load over last 28 days
-    #last28_start = end_day - timedelta(days=27)
-    #daily_last28 = daily[(daily["fecha_sesion"] >= last28_start) & (daily["fecha_sesion"] <= end_day)]
-    #fatiga_cronica = daily_last28["ua_total"].mean() if not daily_last28.empty else 0.0
-    #res["fatiga_cronica"] = float(fatiga_cronica)
-    
-    # Adaptation index (example): chronic - acute/7 (normalize acute per day)
-    # res["adaptacion"] = float(fatiga_cronica - (fatiga_aguda / 7.0))
-
-    # # ACWR (acute:chronic) using mean-per-day normalization
-    # # Avoid divide-by-zero
-    # res["acwr"] = float((fatiga_aguda / 7.0) / fatiga_cronica) if fatiga_cronica else None
-
-    # -------------------------
-    # Fatiga crónica (bases)
-    # -------------------------
-    res["fatiga_cronica_28d"] = _chronic_load(daily, end_day, 28)
-    res["fatiga_cronica_42d"] = _chronic_load(daily, end_day, 42)
-    res["fatiga_cronica_56d"] = _chronic_load(daily, end_day, 56)
-
-    # -------------------------
-    # Adaptación (por ventana)
-    # -------------------------
-    res["adaptacion_28d"] = (
-        res["fatiga_cronica_28d"] - (fatiga_aguda / 7.0)
-        if res["fatiga_cronica_28d"] else None
-    )
-
-    res["adaptacion_42d"] = (
-        res["fatiga_cronica_42d"] - (fatiga_aguda / 7.0)
-        if res["fatiga_cronica_42d"] else None
-    )
-
-    res["adaptacion_56d"] = (
-        res["fatiga_cronica_56d"] - (fatiga_aguda / 7.0)
-        if res["fatiga_cronica_56d"] else None
-    )
-    # -------------------------
-    # Recuperación (por ventana)
-    # -------------------------
-    fatiga_aguda_diaria = fatiga_aguda / 7.0
-    res["fatiga_aguda_diaria"] = float(fatiga_aguda_diaria)
-
-    res["recuperacion_28d"] = (
-       res["fatiga_cronica_28d"] -  fatiga_aguda_diaria
-       if res["fatiga_cronica_28d"] else None
-    )  
-
-    res["recuperacion_42d"] = (
-       res["fatiga_cronica_42d"] - fatiga_aguda_diaria
-       if res["fatiga_cronica_42d"] else None   
-    )
-
-    res["recuperacion_56d"] = (
-       res["fatiga_cronica_56d"] - fatiga_aguda_diaria
-       if res["fatiga_cronica_56d"] else None       
-    )
-
-    # -------------------------
-    # ACWR (por ventana)
-    # -------------------------
-    res["acwr_28d"] = (
-        (fatiga_aguda / 7.0) / res["fatiga_cronica_28d"]
-        if res["fatiga_cronica_28d"] else None
-    )
-
-    res["acwr_42d"] = (
-        (fatiga_aguda / 7.0) / res["fatiga_cronica_42d"]
-        if res["fatiga_cronica_42d"] else None
-    )
-
-    res["acwr_56d"] = (
-        (fatiga_aguda / 7.0) / res["fatiga_cronica_56d"]
-        if res["fatiga_cronica_56d"] else None
-    )
-
     res["minutos_sesion"] = float(day_row["minutos_total"].iloc[0]) if not day_row.empty else 0.0
+
+    # =========================
+    # Métricas mensuales visibles
+    # =========================
+    m_start, m_end = _month_range(end_day)
+    daily_month = _build_window(m_start, m_end)
+
+    res["carga_mes"] = float(daily_month["ua_total"].sum()) if not daily_month.empty else 0.0
+    res["carga_media_mes"] = float(daily_month["ua_total"].mean()) if not daily_month.empty else 0.0
+
+    # =========================
+    # Fatiga aguda 7d
+    # =========================
+    fatiga_aguda_total = float(daily_last7["ua_total"].sum())
+    fatiga_aguda_media = float(daily_last7["ua_total"].mean())
+
+    res["fatiga_aguda"] = fatiga_aguda_total
+    res["fatiga_aguda_7d_media"] = fatiga_aguda_media
+
+    # =========================
+    # Fatiga crónica con ventanas fijas
+    # =========================
+    daily_28 = _build_window(end_day - timedelta(days=27), end_day)
+    daily_42 = _build_window(end_day - timedelta(days=41), end_day)
+    daily_56 = _build_window(end_day - timedelta(days=55), end_day)
+
+    res["fatiga_cronica_28d"] = float(daily_28["ua_total"].mean())
+    res["fatiga_cronica_42d"] = float(daily_42["ua_total"].mean())
+    res["fatiga_cronica_56d"] = float(daily_56["ua_total"].mean())
+
+    # =========================
+    # Estado de forma
+    # =========================
+    res["estado_forma_28d"] = res["fatiga_cronica_28d"] - fatiga_aguda_media
+    res["estado_forma_42d"] = res["fatiga_cronica_42d"] - fatiga_aguda_media
+    res["estado_forma_56d"] = res["fatiga_cronica_56d"] - fatiga_aguda_media
+
+    # =========================
+    # ACWR
+    # =========================
+    res["acwr_28d"] = (
+        fatiga_aguda_media / res["fatiga_cronica_28d"]
+        if res["fatiga_cronica_28d"] > 0 else None
+    )
+    res["acwr_42d"] = (
+        fatiga_aguda_media / res["fatiga_cronica_42d"]
+        if res["fatiga_cronica_42d"] > 0 else None
+    )
+    res["acwr_56d"] = (
+        fatiga_aguda_media / res["fatiga_cronica_56d"]
+        if res["fatiga_cronica_56d"] > 0 else None
+    )
+
     return res
 
 # def compute_rpe_timeseries(
@@ -328,6 +382,7 @@ def _ema(series: pd.Series, tau: int) -> pd.Series:
     alpha = 1 - np.exp(-1 / tau)
     return series.ewm(alpha=alpha, adjust=False).mean()
 
+
 def compute_rpe_timeseries(
     df: pd.DataFrame,
     ventana_aguda: int = 7,
@@ -335,38 +390,25 @@ def compute_rpe_timeseries(
 ) -> pd.DataFrame:
     """
     Genera un DataFrame diario continuo con estados de carga interna.
-    Incluye:
-    - SMA (media móvil)
-    - EMA (modelo Banister / Excel)
+    Incluye SMA y EMA.
     """
+
+    df = _prepare_checkout_df(df)
 
     if df is None or df.empty:
         return pd.DataFrame()
 
-    df = df.copy()
+    daily = _daily_loads(df).copy()
 
-    # -------------------------
-    # Fecha
-    # -------------------------
-    df["fecha_sesion"] = pd.to_datetime(df["fecha_sesion"], errors="coerce")
-    df = df.dropna(subset=["fecha_sesion"])
+    if daily.empty:
+        return pd.DataFrame()
 
-    # -------------------------
-    # UA diaria
-    # -------------------------
-    daily = (
-        df.groupby("fecha_sesion", as_index=False)["ua"]
-        .sum()
-        .rename(columns={"ua": "ua_diaria"})
-        .set_index("fecha_sesion")
-        .asfreq("D")
-    )
+    daily["fecha_sesion"] = pd.to_datetime(daily["fecha_sesion"], errors="coerce")
+    daily = daily.dropna(subset=["fecha_sesion"]).sort_values("fecha_sesion")
 
-    daily["ua_diaria"] = daily["ua_diaria"].fillna(0)
+    daily = daily.rename(columns={"ua_total": "ua_diaria"})
 
-    # =====================================================
-    # SMA (media móvil)
-    # =====================================================
+    # SMA
     daily[f"fatiga_aguda_{ventana_aguda}d_sma"] = (
         daily["ua_diaria"]
         .rolling(window=ventana_aguda, min_periods=1)
@@ -379,7 +421,7 @@ def compute_rpe_timeseries(
         .mean()
     )
 
-    daily[f"recuperacion_{ventana_cronica}d_sma"] = (
+    daily[f"estado_forma_{ventana_cronica}d_sma"] = (
         daily[f"fatiga_cronica_{ventana_cronica}d_sma"]
         - daily[f"fatiga_aguda_{ventana_aguda}d_sma"]
     )
@@ -389,22 +431,18 @@ def compute_rpe_timeseries(
         / daily[f"fatiga_cronica_{ventana_cronica}d_sma"]
     )
 
-    # =====================================================
-    # EMA (Excel / Banister)
-    # =====================================================
-    # 🔴 Agudo → τ = ventana_aguda
+    # EMA
     daily[f"fatiga_aguda_{ventana_aguda}d_ema"] = _ema(
         daily["ua_diaria"],
         ventana_aguda
     )
 
-    # 🔵 Crónico → τ = ventana_cronica
     daily[f"fatiga_cronica_{ventana_cronica}d_ema"] = _ema(
         daily["ua_diaria"],
         ventana_cronica
     )
 
-    daily[f"recuperacion_{ventana_cronica}d_ema"] = (
+    daily[f"estado_forma_{ventana_cronica}d_ema"] = (
         daily[f"fatiga_cronica_{ventana_cronica}d_ema"]
         - daily[f"fatiga_aguda_{ventana_aguda}d_ema"]
     )
@@ -414,10 +452,53 @@ def compute_rpe_timeseries(
         / daily[f"fatiga_cronica_{ventana_cronica}d_ema"]
     )
 
-    # -------------------------
-    # Redondeo
-    # -------------------------
     num_cols = daily.select_dtypes(include="number").columns
     daily[num_cols] = daily[num_cols].round(2)
 
-    return daily.reset_index()
+    return daily.reset_index(drop=True)
+
+
+def compute_cambio_carga(df_states: pd.DataFrame) -> float | None:
+    """
+    Calcula el % de cambio de carga:
+    últimos 3 días vs 3 días anteriores.
+    """
+
+    if df_states is None or df_states.empty:
+        return None
+
+    df = df_states.copy().sort_values("fecha_sesion")
+
+    if len(df) < 6:
+        return None
+
+    last3 = df["ua_diaria"].tail(3).mean()
+    prev3 = df["ua_diaria"].tail(6).head(3).mean()
+
+    if prev3 == 0:
+        return None
+
+    cambio = (last3 / prev3) - 1
+    return cambio
+
+
+def compute_dias_riesgo(df_states: pd.DataFrame, ventana: int = 14) -> int:
+    """
+    Cuenta cuántos días ACWR > 1.5 en la ventana reciente.
+    """
+
+    if df_states is None or df_states.empty:
+        return 0
+
+    df = df_states.copy().sort_values("fecha_sesion")
+
+    col = "acwr_42d_sma"  # usa SMA para estabilidad
+
+    if col not in df.columns:
+        return 0
+
+    recent = df.tail(ventana)
+
+    dias = (recent[col] > 1.5).sum()
+    return int(dias)
+
