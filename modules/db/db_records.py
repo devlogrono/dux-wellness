@@ -84,11 +84,12 @@ def get_records_db(as_df: bool = True):
             df = df[df["usuario"] == "developer"]
         else:
             df = df[df["usuario"] != "developer"]
+
     # Filtrar por rol
-    #rol = st.session_state["auth"]["rol"].lower()
-    #if rol == "developer":
+    # rol = st.session_state["auth"]["rol"].lower()
+    # if rol == "developer":
     #    df = df[df["usuario"] == "developer"]
-    #else:
+    # else:
     #    df = df[df["usuario"] != "developer"]
 
     # Columna nombre_jugadora

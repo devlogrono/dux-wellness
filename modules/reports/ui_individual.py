@@ -103,18 +103,6 @@ def metricas(df: pd.DataFrame, jug_sel, turno_sel, start, end) -> None:
     flt = RPEFilters(jugadores=jug_sel or None, turnos=turno_sel or None, start=start, end=end)
     metrics = compute_rpe_metrics(df, flt)
 
-
-    daily = metrics["daily_table"].copy()
-    daily["fecha_sesion"] = pd.to_datetime(daily["fecha_sesion"])
-
-    end_day = pd.to_datetime(flt.end or daily["fecha_sesion"].dt.date.max())
-    last7_start = end_day - pd.Timedelta(days=6)
-
-    check7 = daily[
-        (daily["fecha_sesion"] >= last7_start) &
-        (daily["fecha_sesion"] <= end_day)
-    ].copy()
-
     #st.dataframe(metrics)
     # --- Validar datos ---
     if df is None or df.empty:
