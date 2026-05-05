@@ -5,9 +5,9 @@ from modules.i18n.i18n import t
 from modules.reports.metrics import RPEFilters, _ema, compute_rpe_metrics, _daily_loads, _prepare_checkout_df
 from .plots_grupales import (
                             plot_estado_carga_grupal, 
-                             plot_rpe_promedio, tabla_resumen, 
-                             plot_distribucion_estado_forma,
-                             plot_estado_carga_grupal_sma, 
+                             plot_rpe_promedio, tabla_resumen,         
+                             plot_estado_forma_puntos_grupal,
+                             plot_wellness_resumen_periodico,
                              plot_monotonia_strain,
                              plot_acwr,
                              plot_carga_semanal_base,
@@ -39,6 +39,7 @@ def group_dashboard(
     tabs = st.tabs([
         t(":material/monitor_heart: Wellness"),
         t(":material/show_chart: Estado de carga"),
+        t(":material/scatter_plot: Estado de forma"),
         t(":material/monitor_weight: Carga y esfuerzo"),
         t(" Montonía y strain"),
         t(":material/trending_up: RPE"),
@@ -49,12 +50,9 @@ def group_dashboard(
         wellness_dashboard_grupal(df_visual)
     with tabs[1]:
         plot_estado_carga_grupal(df_estado_plot)
-        st.divider()
-        plot_estado_carga_grupal_sma(df_estado_plot)
-        st.divider()
-        plot_distribucion_estado_forma(df_players)
-
     with tabs[2]:
+        plot_estado_forma_puntos_grupal(df_players)
+    with tabs[3]:
         weekly = plot_carga_semanal_base(df_visual)
 
         if start is not None and end is not None:
@@ -83,13 +81,13 @@ def group_dashboard(
             st.divider()
             plot_carga_diaria_detalle_base(df_visual, start=start_week, end=end_week)
         
-    with tabs[3]:
-        plot_monotonia_strain(df_visual, scope="grupal")
     with tabs[4]:
-        plot_rpe_promedio(df_visual)
+        plot_monotonia_strain(df_visual, scope="grupal")
     with tabs[5]:
-         plot_acwr(df_estado_plot, ventana_cronica=42, metodo="sma", scope="grupal")
+        plot_rpe_promedio(df_visual)
     with tabs[6]:
+         plot_acwr(df_estado_plot, ventana_cronica=42, metodo="sma", scope="grupal")
+    with tabs[7]:
         tabla_resumen(df_visual)
 
 
@@ -673,28 +671,40 @@ def wellness_dashboard_grupal(df_filtrado: pd.DataFrame):
 
     tabs = st.tabs([
         t("Evolución diaria"),
-        t("Evolución semanal"),
-        t("Evolución mensual"),
+        t("Resumen semanal"),
+        t("Resumen mensual"),
         t("Por tipo de carga"),
     ])
 
     with tabs[0]:
-        plot_wellness_evolucion_grupal(df_daily)
+        plot_wellness_evolucion_grupal(
+            df_daily,
+            scope="grupal"
+        )
 
     with tabs[1]:
-        if df_weekly.empty:
-            st.info(t("No hay datos semanales de wellness para mostrar."))
-        else:
-            st.dataframe(df_weekly, use_container_width=True, hide_index=True)
+        plot_wellness_resumen_periodico(
+            df_weekly,
+            periodo_col="semana",
+            titulo="Resumen semanal de wellness grupal",
+            etiqueta_periodo="semana",
+            scope="grupal"
+        )
 
     with tabs[2]:
-        if df_monthly.empty:
-            st.info(t("No hay datos mensuales de wellness para mostrar."))
-        else:
-            st.dataframe(df_monthly, use_container_width=True, hide_index=True)
+        plot_wellness_resumen_periodico(
+            df_monthly,
+            periodo_col="mes",
+            titulo="Resumen mensual de wellness grupal",
+            etiqueta_periodo="mes",
+            scope="grupal"
+        )
 
     with tabs[3]:
-        plot_wellness_por_tipo_carga(df_tipo)
+        plot_wellness_por_tipo_carga(
+            df_tipo,
+            scope="grupal"
+        )
 
 
 

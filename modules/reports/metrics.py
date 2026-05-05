@@ -96,6 +96,7 @@ def _daily_loads(df: pd.DataFrame) -> pd.DataFrame:
 
     return daily
 
+#NOSEUSA
 def _current_week_range(end_day: date) -> tuple[date, date]:
     # Monday to Sunday containing end_day
     weekday = end_day.weekday()  # Monday=0
@@ -112,6 +113,7 @@ def _month_range(end_day: date) -> tuple[date, date]:
     end = next_month_start - timedelta(days=1)
     return start, end
 
+#NOSEUSA
 def _chronic_load(daily: pd.DataFrame, end_day: date, days: int) -> float:
     """
     Calcula carga crónica como media diaria de UA

@@ -76,21 +76,21 @@ def get_records_db(as_df: bool = True):
     # =====================================================
     # DEBUG LOCAL: mostrar todos los registros (sin filtro por rol)
     # =====================================================
-    modo_debug_all_data = True
+    # modo_debug_all_data = True
 
-    if not modo_debug_all_data:
-        rol = st.session_state["auth"]["rol"].lower()
-        if rol == "developer":
-            df = df[df["usuario"] == "developer"]
-        else:
-            df = df[df["usuario"] != "developer"]
+    # if not modo_debug_all_data:
+    #     rol = st.session_state["auth"]["rol"].lower()
+    #     if rol == "developer":
+    #         df = df[df["usuario"] == "developer"]
+    #     else:
+    #         df = df[df["usuario"] != "developer"]
 
     # Filtrar por rol
-    # rol = st.session_state["auth"]["rol"].lower()
-    # if rol == "developer":
-    #    df = df[df["usuario"] == "developer"]
-    # else:
-    #    df = df[df["usuario"] != "developer"]
+    rol = st.session_state["auth"]["rol"].lower()
+    if rol == "developer":
+        df = df[df["usuario"] == "developer"]
+    else:
+        df = df[df["usuario"] != "developer"]
 
     # Columna nombre_jugadora
     df.insert(2, "nombre_jugadora", (df["nombre"] + " " + df["apellido"]).str.strip().str.upper())

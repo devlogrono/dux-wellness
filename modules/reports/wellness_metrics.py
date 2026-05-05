@@ -18,7 +18,7 @@ def compute_team_wellness_kpis(df: pd.DataFrame) -> dict:
             "ua_total": None,
             "n_registros": 0,
             "n_jugadoras": 0,
-            "pct_dolor_3omas": None,
+            "pct_dolor>3": None,
         }
 
     dolor_mask = df["dolor"] >= 3 if "dolor" in df.columns else pd.Series(dtype=bool)
@@ -33,7 +33,7 @@ def compute_team_wellness_kpis(df: pd.DataFrame) -> dict:
         "ua_total": round(df["ua"].sum(), 2) if "ua" in df.columns else None,
         "n_registros": int(len(df)),
         "n_jugadoras": int(df["id_jugadora"].nunique()) if "id_jugadora" in df.columns else 0,
-        "pct_dolor_3omas": round(dolor_mask.mean() * 100, 2) if "dolor" in df.columns and len(df) > 0 else None,
+        "pct_dolor>3": round(dolor_mask.mean() * 100, 2) if "dolor" in df.columns and len(df) > 0 else None,
     }
 
 
@@ -141,7 +141,7 @@ def compute_player_wellness_kpis(df: pd.DataFrame) -> dict:
             "rpe_medio": None,
             "ua_total": None,
             "n_registros": 0,
-            "pct_dolor_3omas": None,
+            "pct_dolor>3": None,
         }
 
     out = df.copy()
@@ -171,7 +171,7 @@ def compute_player_wellness_kpis(df: pd.DataFrame) -> dict:
         "rpe_medio": round(out["rpe"].mean(), 2) if "rpe" in out.columns else None,
         "ua_total": round(out["ua"].sum(), 2) if "ua" in out.columns else None,
         "n_registros": int(len(out)),
-        "pct_dolor_3omas": round(dolor_mask.mean() * 100, 2) if "dolor" in out.columns and len(out) > 0 else None,
+        "pct_dolor>3": round(dolor_mask.mean() * 100, 2) if "dolor" in out.columns and len(out) > 0 else None,
     }
 
 def build_player_daily_wellness(df: pd.DataFrame) -> pd.DataFrame:

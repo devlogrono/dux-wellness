@@ -3,17 +3,21 @@ import pandas as pd
 import numpy as np
 
 from modules.db.db_lesiones import get_wellness_pre_lesion
-from .metrics import compute_rpe_metrics, RPEFilters, compute_rpe_timeseries, compute_cambio_carga, compute_dias_riesgo
+from .metrics import compute_rpe_metrics, RPEFilters, compute_rpe_timeseries, compute_cambio_carga, compute_dias_riesgo 
 from modules.util.util import (get_photo, clean_image_url, calcular_edad)
 from modules.i18n.i18n import t
+from modules.reports.wellness_metrics import (
+    build_team_weekly_wellness,
+    build_team_monthly_wellness,
+    build_wellness_by_tipo_carga,
+)
 from modules.reports.wellness_metrics import (compute_player_wellness_kpis, build_player_daily_wellness, compute_player_wellness_cards)
-from.plots_grupales import plot_carga_diaria_detalle_base, plot_carga_semanal_base, plot_acwr, plot_monotonia_strain
+from.plots_grupales import (plot_carga_diaria_detalle_base, plot_carga_semanal_base, 
+    plot_acwr, plot_monotonia_strain, plot_wellness_evolucion_grupal,plot_wellness_resumen_periodico, plot_wellness_por_tipo_carga)
 from .plots_individuales import (
     grafico_wellness_pre_lesion,
     grafico_rpe_ua,
     grafico_duracion_rpe,
-    grafico_acwr,
-    grafico_wellness,
     plot_carga_fatiga_recuperacion,
     tabla_wellness_individual,
     plot_wellness_evolucion_individual
@@ -505,9 +509,14 @@ def render_player_alerts_table(metrics: dict) -> None:
     st.markdown(t("### **Alertas e interpretación**"))
     st.dataframe(alertas_df, hide_index=True, use_container_width=True)
 
-def graficos_individuales(df_visual: pd.DataFrame, df_calculo: pd.DataFrame, start=None, end=None):
+def graficos_individuales(
+    df_visual: pd.DataFrame,
+    df_calculo: pd.DataFrame,
+    start=None,
+    end=None
+):
     """Gráficos individuales para análisis de carga, bienestar y riesgo."""
-    
+
     if df_visual is None or df_visual.empty:
         st.info("No hay datos disponibles para graficar.")
         return
@@ -515,7 +524,9 @@ def graficos_individuales(df_visual: pd.DataFrame, df_calculo: pd.DataFrame, sta
     df_player_visual = df_visual.copy().sort_values("fecha_sesion")
     df_player_calculo = df_calculo.copy().sort_values("fecha_sesion")
 
+    # =====================================================
     # Serie temporal de carga calculada con histórico ampliado
+    # =====================================================
     df_states = compute_rpe_timeseries(df_player_calculo)
 
     # Recorte visual al rango seleccionado
@@ -526,8 +537,15 @@ def graficos_individuales(df_visual: pd.DataFrame, df_calculo: pd.DataFrame, sta
         ].copy()
     else:
         df_states_plot = df_states.copy()
-    
-    id_jugadora = df_player_visual["id_jugadora"].iloc[0] if "id_jugadora" in df_player_visual.columns and not df_player_visual.empty else None
+
+    # =====================================================
+    # Lesiones previas
+    # =====================================================
+    id_jugadora = (
+        df_player_visual["id_jugadora"].iloc[0]
+        if "id_jugadora" in df_player_visual.columns and not df_player_visual.empty
+        else None
+    )
 
     pre_lesion = get_wellness_pre_lesion(
         id_jugadora=id_jugadora,
@@ -536,9 +554,16 @@ def graficos_individuales(df_visual: pd.DataFrame, df_calculo: pd.DataFrame, sta
     ) if id_jugadora else pd.DataFrame()
 
     fecha_lesion = None
-    if pre_lesion is not None and not pre_lesion.empty:
-        fecha_lesion = pd.to_datetime(pre_lesion["fecha_lesion"], errors="coerce").max()
 
+    if pre_lesion is not None and not pre_lesion.empty:
+        fecha_lesion = pd.to_datetime(
+            pre_lesion["fecha_lesion"],
+            errors="coerce"
+        ).max()
+
+    # =====================================================
+    # Tabs principales
+    # =====================================================
     st.markdown(t("### **Gráficos**"))
 
     tabs = st.tabs([
@@ -552,25 +577,104 @@ def graficos_individuales(df_visual: pd.DataFrame, df_calculo: pd.DataFrame, sta
         t("Wellness + Lesiones")
     ])
 
+    # =====================================================
+    # TAB 0 - WELLNESS
+    # =====================================================
     with tabs[0]:
-        cards = compute_player_wellness_cards(df_player_visual, periodo="Mes")
+        # -------------------------
+        # Tarjetas resumen
+        # -------------------------
+        cards = compute_player_wellness_cards(
+            df_player_visual,
+            periodo="Mes"
+        )
+
         render_player_wellness_summary_cards(cards)
+
         st.divider()
 
+        # -------------------------
+        # KPIs individuales
+        # -------------------------
         wellness_individual_kpis(df_player_visual)
+
         st.divider()
 
-        tabla_wellness_individual(df_player_visual)
-        st.divider()
-
+        # -------------------------
+        # DataFrames agregados para gráficos
+        # -------------------------
         df_daily = build_player_daily_wellness(df_player_visual)
-        plot_wellness_evolucion_individual(df_daily)
+        df_weekly = build_team_weekly_wellness(df_player_visual)
+        df_monthly = build_team_monthly_wellness(df_player_visual)
+        df_tipo = build_wellness_by_tipo_carga(df_player_visual)
+
+        tabs_wellness = st.tabs([
+            t("Evolución diaria"),
+            t("Resumen semanal"),
+            t("Resumen mensual"),
+            t("Por tipo de carga"),
+        ])
+
+        with tabs_wellness[0]:
+            plot_wellness_evolucion_grupal(
+                df_daily,
+                scope="individual"
+            )
+
+        with tabs_wellness[1]:
+            plot_wellness_resumen_periodico(
+                df_weekly,
+                periodo_col="semana",
+                titulo="Resumen semanal de wellness individual",
+                etiqueta_periodo="semana",
+                scope="individual"
+            )
+
+        with tabs_wellness[2]:
+            plot_wellness_resumen_periodico(
+                df_monthly,
+                periodo_col="mes",
+                titulo="Resumen mensual de wellness individual",
+                etiqueta_periodo="mes",
+                scope="individual"
+            )
+
+        with tabs_wellness[3]:
+            plot_wellness_por_tipo_carga(
+                df_tipo,
+                scope="individual"
+            )
+        
         st.divider()
 
+        # -------------------------
+        # Tabla detalle wellness
+        # -------------------------
+        tabla_wellness_individual(df_player_visual)
+
+    # =====================================================
+    # TAB 1 - ESTADO DE CARGA
+    # =====================================================
     with tabs[1]:
-        plot_carga_fatiga_recuperacion(df_states_plot, metodo = "sma")
-        st.divider()
-        plot_carga_fatiga_recuperacion(df_states_plot, metodo ="ema")
+        # EMA como vista principal
+        plot_carga_fatiga_recuperacion(
+            df_states_plot,
+            metodo="ema"
+        )
+
+        # SMA como apoyo técnico
+        with st.expander(
+            t("Ver versión técnica con media móvil simple (SMA)"),
+            expanded=False
+        ):
+            plot_carga_fatiga_recuperacion(
+                df_states_plot,
+                metodo="sma"
+            )
+
+    # =====================================================
+    # TAB 2 - CARGA Y ESFUERZO
+    # =====================================================
     with tabs[2]:
         weekly = plot_carga_semanal_base(df_player_visual)
 
@@ -579,6 +683,7 @@ def graficos_individuales(df_visual: pd.DataFrame, df_calculo: pd.DataFrame, sta
 
             if n_dias <= 7:
                 st.divider()
+
                 plot_carga_diaria_detalle_base(
                     df_player_visual,
                     start=start,
@@ -594,31 +699,77 @@ def graficos_individuales(df_visual: pd.DataFrame, df_calculo: pd.DataFrame, sta
                 )
 
                 row = weekly[weekly["rango_semana"] == semana_sel].iloc[0]
+
                 start_week = pd.to_datetime(row["inicio_semana"]).date()
                 end_week = pd.to_datetime(row["fin_semana"]).date()
 
                 st.divider()
-                plot_carga_diaria_detalle_base(df_player_visual, start=start_week, end=end_week, )
 
+                plot_carga_diaria_detalle_base(
+                    df_player_visual,
+                    start=start_week,
+                    end=end_week,
+                )
+
+    # =====================================================
+    # TAB 3 - ACWR
+    # =====================================================
     with tabs[3]:
-        plot_acwr(df_states_plot, ventana_cronica=42, metodo="sma", scope="individual")
+        plot_acwr(
+            df_states_plot,
+            ventana_cronica=42,
+            metodo="sma",
+            scope="individual"
+        )
+
+    # =====================================================
+    # TAB 4 - MONOTONÍA Y STRAIN
+    # =====================================================
     with tabs[4]:
-        plot_monotonia_strain(df_player_visual, scope="individual")
+        plot_monotonia_strain(
+            df_player_visual,
+            scope="individual"
+        )
+
+    # =====================================================
+    # TAB 5 - RPE Y UA
+    # =====================================================
     with tabs[5]:
         grafico_rpe_ua(df_player_visual)
 
+    # =====================================================
+    # TAB 6 - DURACIÓN VS RPE
+    # =====================================================
     with tabs[6]:
         grafico_duracion_rpe(df_player_visual)
 
+    # =====================================================
+    # TAB 7 - WELLNESS + LESIONES
+    # =====================================================
     with tabs[7]:
-        if not pre_lesion.empty:
+        if pre_lesion is not None and not pre_lesion.empty:
             grafico_wellness_pre_lesion(pre_lesion)
+
             st.divider()
 
-            plot_carga_fatiga_recuperacion(df_states,metodo="ema",fecha_lesion=fecha_lesion,window_days=14)
+            plot_carga_fatiga_recuperacion(
+                df_states,
+                metodo="ema",
+                fecha_lesion=fecha_lesion,
+                window_days=14
+            )
+
             st.divider()
 
-            plot_acwr(df_states,ventana_cronica=42,metodo="ema",scope="individual",fecha_lesion=fecha_lesion,window_days=14)
+            plot_acwr(
+                df_states,
+                ventana_cronica=42,
+                metodo="ema",
+                scope="individual",
+                fecha_lesion=fecha_lesion,
+                window_days=14
+            )
+
         else:
             st.info("No hay registros de lesiones.")
 
@@ -687,8 +838,8 @@ def wellness_individual_kpis(df_player: pd.DataFrame):
 
     with c6:
         st.metric(
-            t("% dolor ≥ 3"),
-            f"{kpis['pct_dolor_3omas']:.1f}%" if kpis["pct_dolor_3omas"] is not None else "-"
+            t("% dolor > 3"),
+            f"{kpis['pct_dolor>3']:.1f}%" if kpis["pct_dolor>3"] is not None else "-"
         )
 
 
