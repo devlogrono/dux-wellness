@@ -73,18 +73,6 @@ def get_records_db(as_df: bool = True):
     df["fecha_sesion"] = pd.to_datetime(df["fecha_sesion"], errors="coerce").dt.date
     df["fecha_hora_registro"] = pd.to_datetime(df["fecha_hora_registro"], errors="coerce")
 
-    # =====================================================
-    # DEBUG LOCAL: mostrar todos los registros (sin filtro por rol)
-    # =====================================================
-    # modo_debug_all_data = True
-
-    # if not modo_debug_all_data:
-    #     rol = st.session_state["auth"]["rol"].lower()
-    #     if rol == "developer":
-    #         df = df[df["usuario"] == "developer"]
-    #     else:
-    #         df = df[df["usuario"] != "developer"]
-
     # Filtrar por rol
     rol = st.session_state["auth"]["rol"].lower()
     if rol == "developer":
