@@ -121,16 +121,23 @@ def calc_alertas(df_periodo: pd.DataFrame, df_completo: pd.DataFrame, periodo: s
     """
     Calcula el número y porcentaje de jugadoras en riesgo dentro del periodo seleccionado.
 
-    Se consideran todas las jugadoras con registro en el periodo,
-    independientemente de si el tipo es checkin o checkout.
+    ✔️ Compatible con el nuevo modelo donde 'checkout' sobrescribe 'checkin'.
+    ✔️ Usa compute_player_wellness_means(df_periodo) para coherencia global.
     """
 
     if df_periodo.empty:
         return 0, 0, 0, [], 0
 
-    # Usar todo el periodo: checkin + checkout
-    base_df = df_periodo.copy()
+    # --- Si existen registros tipo 'checkin', los usamos, de lo contrario todo el periodo ---
+    if "tipo" in df_periodo.columns:
+        df_in = df_periodo[df_periodo["tipo"].str.lower() == "checkin"].copy()
+    else:
+        df_in = pd.DataFrame()
 
+    # En el modelo actual, el checkout reemplaza el checkin → fallback a todo el periodo
+    base_df = df_in if not df_in.empty else df_periodo.copy()
+
+    # --- Calcular riesgo global coherente ---
     try:
         riesgo_df = compute_player_wellness_means(base_df)
         if riesgo_df.empty or "en_riesgo" not in riesgo_df.columns:
@@ -146,10 +153,12 @@ def calc_alertas(df_periodo: pd.DataFrame, df_completo: pd.DataFrame, periodo: s
 
     alertas_pct = round((alertas_count / total_jugadoras) * 100, 1) if total_jugadoras > 0 else 0
 
+    # --- Simulación de 'chart' y 'delta' para compatibilidad con render_metric_cards ---
     chart_alertas = [alertas_pct]
     delta_alertas = 0
 
     return alertas_count, total_jugadoras, alertas_pct, chart_alertas, delta_alertas
+
 # ============================================================
 # 💠 TARJETAS DE MÉTRICAS
 # ============================================================
@@ -240,76 +249,50 @@ delta_ua, chart_ua, alertas_count, total_jugadoras, alertas_pct, chart_alertas, 
 #         f"indicando **fatiga, sobrecarga o molestias significativas** que aumentan el riesgo de lesión o bajo rendimiento."
 #     )
 
-def mostrar_resumen_tecnico(
-    wellness_prom: float,
-    rpe_prom: float,
-    ua_total: float,
-    alertas_count: int,
-    total_jugadoras: int
-):
+def mostrar_resumen_tecnico(wellness_prom: float, rpe_prom: float, ua_total: float,
+                            alertas_count: int, total_jugadoras: int):
     """
-    Resumen técnico grupal en formato párrafo con colores dinámicos.
+    Muestra en pantalla el resumen técnico del grupo, con interpretación automática
+    del estado de bienestar, esfuerzo percibido y riesgo de alerta.
     """
 
-    # 🟢 Estado de bienestar
+    # 🟢 Estado de bienestar (escala 25)
     estado_bienestar = (
         t("óptimo") if wellness_prom > 20 else
         t("moderado") if wellness_prom >= 15 else
         t("en fatiga")
     )
 
-    if wellness_prom > 20:
-        color_wellness = "#2ecc71"
-    elif wellness_prom >= 15:
-        color_wellness = "#f39c12"
-    else:
-        color_wellness = "#e74c3c"
-
-    # 🟡 RPE
+    # 🟡 Nivel de esfuerzo percibido (RPE)
     if pd.isna(rpe_prom) or rpe_prom == 0:
         nivel_rpe = t("sin datos")
-        color_rpe = "#95a5a6"
     elif rpe_prom < 5:
         nivel_rpe = t("bajo")
-        color_rpe = "#2ecc71"
     elif rpe_prom <= 7:
         nivel_rpe = t("moderado")
-        color_rpe = "#f39c12"
     else:
         nivel_rpe = t("alto")
-        color_rpe = "#e74c3c"
 
-    # 🔴 Alertas
+    # 🔴 Estado de alertas
     if alertas_count == 0:
         estado_alertas = t("sin jugadoras en zona roja")
-        color_alerta = "#2ecc71"
     elif alertas_count == 1:
         estado_alertas = t("1 jugadora en seguimiento")
-        color_alerta = "#f39c12"
     else:
         estado_alertas = f"{alertas_count} {t('jugadoras en zona roja')}"
-        color_alerta = "#e74c3c"
 
-    # 🧾 Párrafo continuo con colores
+    # 🧾 Resumen técnico mostrado en Streamlit
     st.markdown(
-        f"""
-        :material/description: <b>{t('Resumen técnico')}:</b>
-        {t('El grupo muestra un estado de bienestar')}
-        <span style='color:{color_wellness}; font-weight:bold'>{estado_bienestar}</span>
-        ({wellness_prom}/25),
-        {t('con un esfuerzo percibido')}
-        <span style='color:{color_rpe}; font-weight:bold'>{nivel_rpe}</span>
-        (RPE {rpe_prom}).
-        {t('La carga interna total es de')}
-        <b>{ua_total} UA</b>
-        {t('y actualmente')}
-        <span style='color:{color_alerta}; font-weight:bold'>{estado_alertas}</span>,
-        {t('debido a que el bienestar promedio es mayor a 15 puntos y no hay jugadoras con dolor >3')}.
-        """,
-        unsafe_allow_html=True
+        f":material/description: **{t('Resumen técnico')}:** "
+        f"{t('El grupo muestra un estado de bienestar')} **{estado_bienestar}** "
+        f"({wellness_prom}/25) "
+        f"{t('con un esfuerzo percibido')} **{nivel_rpe}** (RPE {rpe_prom}). "
+        f"{t('La carga interna total es de')} **{ua_total} UA** "
+        f"{t('y actualmente hay')} **{estado_alertas}**, "
+        f"{t('debido a que el promedio de bienestar x 5 es menor a 15 puntos')} "
+        f"{t('(escala 25)')}, "
+        f"{t('indicando fatiga, sobrecarga o molestias significativas que aumentan el riesgo de lesión o bajo rendimiento')}."
     )
-
-
 
 
 def show_interpretation(wellness_prom, rpe_prom, ua_total, alertas_count, alertas_pct, delta_ua, total_jugadoras):
