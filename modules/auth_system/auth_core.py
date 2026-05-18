@@ -169,6 +169,20 @@ def get_current_user():
 
 
 def validate_login():
+    ensure_state()
+
+    # 👉 MODO DESARROLLO LOCAL
+    if True:
+        st.session_state["auth"] = {
+            "is_logged_in": True,
+            "username": "dev_user",
+            "name": "Javier",
+            "rol": "developer",
+            "token": "dev_token",
+            "session_id": "dev_session",
+        }
+        return True
+
     return get_current_user() is not None
 
 

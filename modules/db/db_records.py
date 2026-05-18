@@ -13,12 +13,22 @@ def get_records_db(as_df: bool = True):
     """
 
     zonas_anatomicas_df = load_catalog_list_db("zonas_anatomicas", as_df=True)
-    map_zonas = dict(zip(zonas_anatomicas_df["id"], zonas_anatomicas_df["nombre"]))
 
-    # ----------------------------
-    # Control de acceso reutilizable
-    # ----------------------------
-    user_filter, user_params = build_user_access_filter("w")
+    if (
+        zonas_anatomicas_df is None
+        or zonas_anatomicas_df.empty
+        or "id" not in zonas_anatomicas_df.columns
+        or "nombre" not in zonas_anatomicas_df.columns
+    ):
+        map_zonas = {}
+    else:
+        map_zonas = dict(
+            zip(
+                zonas_anatomicas_df["id"],
+                zonas_anatomicas_df["nombre"]
+            )
+        )
+
 
     sql = f"""
         SELECT 
