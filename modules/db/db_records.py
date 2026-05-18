@@ -29,10 +29,6 @@ def get_records_db(as_df: bool = True):
             )
         )
 
-    # ----------------------------
-    # Control de acceso reutilizable
-    # ----------------------------
-    user_filter, user_params = build_user_access_filter("w")
 
     sql = f"""
         SELECT 
