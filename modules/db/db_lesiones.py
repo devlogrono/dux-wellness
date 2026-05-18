@@ -22,7 +22,21 @@ def get_wellness_pre_lesion(
     # Catálogo zonas anatómicas
     # ----------------------------
     zonas_df = load_catalog_list_db("zonas_anatomicas", as_df=True)
-    map_zonas = dict(zip(zonas_df["id"], zonas_df["nombre"]))
+
+    if (
+        zonas_df is None
+        or zonas_df.empty
+        or "id" not in zonas_df.columns
+        or "nombre" not in zonas_df.columns
+    ):
+        map_zonas = {}
+    else:
+        map_zonas = dict(
+            zip(
+                zonas_df["id"],
+                zonas_df["nombre"]
+            )
+        )
 
     # ----------------------------
     # Filtro opcional por jugadora

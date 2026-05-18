@@ -9,6 +9,7 @@ from modules.app_config.styles import get_color_wellness
 import pandas as pd
 import plotly.graph_objects as go
 import pandas as pd
+from modules.reports.plots_grupales import render_interpretacion_grafico
 
 
 # 1️⃣ RPE y UA -------------------------------------------------------
@@ -124,115 +125,6 @@ def grafico_duracion_rpe(df: pd.DataFrame):
 #     chart = alt.layer(bg, rules, line, pts, labels).properties(height=320, width="container", title=t("Evolución del índice ACWR (Relación Agudo:Crónico)"))
 #     st.altair_chart(chart)
 
-def grafico_acwr(
-    df_states: pd.DataFrame,
-    ventana_cronica: int = 42,
-):
-    """
-    Gráfico de evolución del ACWR a partir de un DataFrame ya calculado
-    (compute_rpe_timeseries).
-    """
-
-    col_acwr = f"acwr_{ventana_cronica}d_ema"
-
-    if df_states.empty or col_acwr not in df_states.columns:
-        st.info(t("No hay datos suficientes para mostrar el ACWR."))
-        return
-
-    df = df_states[["fecha_sesion", col_acwr]].dropna().copy()
-    df.rename(columns={col_acwr: "acwr"}, inplace=True)
-
-    if df.empty:
-        st.info(t("No hay suficientes datos para calcular ACWR."))
-        return
-
-    # -------------------------
-    # Clasificación por zonas
-    # -------------------------
-    def _zone(v: float) -> str:
-        if v < 0.8:
-            return "Subcarga"
-        elif v < 1.3:
-            return "Sweet Spot"
-        elif v < 1.5:
-            return "Elevada"
-        else:
-            return "Peligro"
-
-    df["zona"] = df["acwr"].apply(_zone)
-
-    # -------------------------
-    # Bandas de referencia
-    # -------------------------
-    bandas = pd.DataFrame([
-        {"y0": 0.0, "y1": 0.8, "color": "#E3F2FD"},
-        {"y0": 0.8, "y1": 1.3, "color": "#C8E6C9"},
-        {"y0": 1.3, "y1": 1.5, "color": "#FFE0B2"},
-        {"y0": 1.5, "y1": 3.0, "color": "#FFCDD2"},
-    ])
-
-    bg = alt.Chart(bandas).mark_rect(opacity=0.6).encode(
-        y="y0:Q",
-        y2="y1:Q",
-        color=alt.Color("color:N", scale=None, legend=None),
-    )
-
-    rules = alt.Chart(
-        pd.DataFrame({"y": [0.8, 1.3, 1.5]})
-    ).mark_rule(
-        color="black", strokeDash=[4, 2], opacity=0.7
-    ).encode(y="y:Q")
-
-    base = alt.Chart(df).encode(
-        x=alt.X(
-            "fecha_sesion:T",
-            title=t("Fecha"),
-            axis=alt.Axis(format="%b %d"),
-        ),
-        y=alt.Y(
-            "acwr:Q",
-            title="ACWR",
-            scale=alt.Scale(domain=[0, max(2.5, df["acwr"].max() + 0.2)]),
-        ),
-    )
-
-    line = base.mark_line(
-        color="black", strokeWidth=2, interpolate="monotone"
-    )
-
-    pts = base.mark_circle(size=70).encode(
-        color=alt.Color(
-            "zona:N",
-            scale=alt.Scale(
-                domain=["Subcarga", "Sweet Spot", "Elevada", "Peligro"],
-                range=["#64B5F6", "#2ca25f", "#fdae6b", "#d62728"],
-            ),
-        ),
-        tooltip=[
-            "fecha_sesion:T",
-            alt.Tooltip("acwr:Q", format=".2f"),
-            "zona:N",
-        ],
-    )
-
-    labels = alt.Chart(pd.DataFrame([
-        {"y": 0.4, "text": "Subcarga"},
-        {"y": 1.05, "text": "Punto óptimo"},
-        {"y": 1.4, "text": "Zona elevada"},
-        {"y": 1.8, "text": "Peligro"},
-    ])).mark_text(
-        align="left", dx=5, fontSize=11, color="#444"
-    ).encode(y="y:Q", text="text:N")
-
-    chart = alt.layer(
-        bg, rules, line, pts, labels
-    ).properties(
-        height=320,
-        width="container",
-        title=t(f"Evolución del índice ACWR"),
-    )
-
-    st.altair_chart(chart)
 
 # 4️⃣ Wellness -------------------------------------------------------
 def grafico_wellness(df: pd.DataFrame):
@@ -432,27 +324,144 @@ def tabla_wellness_individual(df: pd.DataFrame):
 
 # Lesiones ------------------------------------------------
 
+# def grafico_wellness_pre_lesion(df_pre: pd.DataFrame):
+#     """
+#     Gráfico interactivo de wellness previo a la lesión.
+#     Incluye línea vertical de lesión y tooltip con zona afectada.
+#     """
+
+#     if df_pre is None or df_pre.empty:
+#         return None
+
+#     df = df_pre.sort_values("fecha_sesion")
+
+#     # Datos clave de la lesión (una sola por gráfico)
+#     fecha_lesion = pd.to_datetime(df["fecha_lesion"].iloc[0])
+#     zona = df["zona_especifica_id"].iloc[0]
+#     lateralidad = df["lateralidad"].iloc[0]
+#     id_lesion = df["id_lesion"].iloc[0]
+
+#     fig = go.Figure()
+
+#     # ----------------------------
+#     # Líneas de wellness
+#     # ----------------------------
+#     wellness_vars = {
+#         "Recuperación": "recuperacion",
+#         "Energía": "energia",
+#         "Sueño": "sueno",
+#         "Estrés": "stress",
+#         "Dolor": "dolor",
+#     }
+
+#     for label, col in wellness_vars.items():
+#         fig.add_trace(
+#             go.Scatter(
+#                 x=df["fecha_sesion"],
+#                 y=df[col],
+#                 mode="lines+markers",
+#                 name=label,
+#                 hovertemplate=(
+#                     "<b>%{x|%d-%m-%Y}</b><br>"
+#                     f"{label}: %{{y}}<extra></extra>"
+#                 )
+#             )
+#         )
+
+#     # ----------------------------
+#     # Línea vertical de lesión
+#     # ----------------------------
+#     fig.add_vline(
+#         x=fecha_lesion,
+#         line_width=3,
+#         line_dash="dash",
+#         line_color="red"
+#     )
+
+#     # ----------------------------
+#     # Punto de lesión (marcador)
+#     # ----------------------------
+#     fig.add_trace(
+#         go.Scatter(
+#             x=[fecha_lesion],
+#             y=[5.2],
+#             mode="markers",
+#             marker=dict(
+#                 size=16,
+#                 color="red",
+#                 symbol="x"
+#             ),
+#             name="Lesión",
+#             hovertemplate=(
+#                 "<b>Lesión</b><br>"
+#                 f"ID: {id_lesion}<br>"
+#                 f"Zona: {zona}<br>"
+#                 f"Lateralidad: {lateralidad}<br>"
+#                 f"Fecha: {fecha_lesion.strftime('%d-%m-%Y')}"
+#                 "<extra></extra>"
+#             )
+#         )
+#     )
+
+#     # ----------------------------
+#     # Layout
+#     # ----------------------------
+#     fig.update_layout(
+#         title="Contexto de wellness previo a la lesión",
+#         xaxis_title="Fecha",
+#         yaxis_title="Escala Wellness (1–5)",
+#         yaxis=dict(range=[1, 5.5]),
+#         legend=dict(
+#             orientation="h",
+#             yanchor="bottom",
+#             y=1.02,
+#             xanchor="left",
+#             x=0
+#         ),
+#         margin=dict(t=80),
+#         hovermode="x unified"
+#     )
+
+#     # ----------------------------
+#     # Eje X: fechas claras
+#     # ----------------------------
+#     fig.update_xaxes(
+#         tickformat="%d-%m",
+#         dtick="D1",
+#         tickangle=-45
+#     )
+
+#     #return fig
+#     st.plotly_chart(fig, use_container_width=True)
+
 def grafico_wellness_pre_lesion(df_pre: pd.DataFrame):
     """
     Gráfico interactivo de wellness previo a la lesión.
-    Incluye línea vertical de lesión y tooltip con zona afectada.
+
+    Características:
+    - Soporta múltiples lesiones
+    - Línea vertical por cada lesión
+    - Marcador visual de lesión
+    - Tooltip con información de lesión
     """
 
     if df_pre is None or df_pre.empty:
         return None
 
-    df = df_pre.sort_values("fecha_sesion")
+    df = df_pre.copy()
 
-    # Datos clave de la lesión (una sola por gráfico)
-    fecha_lesion = pd.to_datetime(df["fecha_lesion"].iloc[0])
-    zona = df["zona_especifica_id"].iloc[0]
-    lateralidad = df["lateralidad"].iloc[0]
-    id_lesion = df["id_lesion"].iloc[0]
+    # ----------------------------
+    # Normalizar fechas
+    # ----------------------------
+    df["fecha_sesion"] = pd.to_datetime(df["fecha_sesion"], errors="coerce")
+    df["fecha_lesion"] = pd.to_datetime(df["fecha_lesion"], errors="coerce")
+
+    df = df.sort_values("fecha_sesion")
 
     fig = go.Figure()
 
     # ----------------------------
-    # Líneas de wellness
+    # Variables wellness
     # ----------------------------
     wellness_vars = {
         "Recuperación": "recuperacion",
@@ -463,6 +472,9 @@ def grafico_wellness_pre_lesion(df_pre: pd.DataFrame):
     }
 
     for label, col in wellness_vars.items():
+        if col not in df.columns:
+            continue
+
         fig.add_trace(
             go.Scatter(
                 x=df["fecha_sesion"],
@@ -471,46 +483,58 @@ def grafico_wellness_pre_lesion(df_pre: pd.DataFrame):
                 name=label,
                 hovertemplate=(
                     "<b>%{x|%d-%m-%Y}</b><br>"
-                    f"{label}: %{{y}}<extra></extra>"
-                )
+                    f"{label}: %{{y}}"
+                    "<extra></extra>"
+                ),
             )
         )
 
     # ----------------------------
-    # Línea vertical de lesión
+    # Obtener lesiones únicas
     # ----------------------------
-    fig.add_vline(
-        x=fecha_lesion,
-        line_width=3,
-        line_dash="dash",
-        line_color="red"
-    )
+    lesiones = df[
+        ["id_lesion", "fecha_lesion", "zona_especifica_id", "lateralidad"]
+    ].drop_duplicates()
 
     # ----------------------------
-    # Punto de lesión (marcador)
+    # Dibujar cada lesión
     # ----------------------------
-    fig.add_trace(
-        go.Scatter(
-            x=[fecha_lesion],
-            y=[5.2],
-            mode="markers",
-            marker=dict(
-                size=16,
-                color="red",
-                symbol="x"
-            ),
-            name="Lesión",
-            hovertemplate=(
-                "<b>Lesión</b><br>"
-                f"ID: {id_lesion}<br>"
-                f"Zona: {zona}<br>"
-                f"Lateralidad: {lateralidad}<br>"
-                f"Fecha: {fecha_lesion.strftime('%d-%m-%Y')}"
-                "<extra></extra>"
+    for idx, (_, lesion) in enumerate(lesiones.iterrows()):
+
+        fecha_lesion = lesion["fecha_lesion"]
+
+        if pd.isna(fecha_lesion):
+            continue
+
+        fig.add_vline(
+            x=fecha_lesion,
+            line_width=3,
+            line_dash="dash",
+            line_color="red",
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=[fecha_lesion],
+                y=[5.2],
+                mode="markers",
+                marker=dict(
+                    size=16,
+                    color="red",
+                    symbol="x",
+                ),
+                name="Lesión" if idx == 0 else None,
+                showlegend=bool(idx == 0),
+                hovertemplate=(
+                    "<b>Lesión</b><br>"
+                    f"ID: {lesion['id_lesion']}<br>"
+                    f"Zona: {lesion['zona_especifica_id']}<br>"
+                    f"Lateralidad: {lesion['lateralidad']}<br>"
+                    f"Fecha: {fecha_lesion.strftime('%d-%m-%Y')}"
+                    "<extra></extra>"
+                ),
             )
         )
-    )
-
     # ----------------------------
     # Layout
     # ----------------------------
@@ -524,89 +548,573 @@ def grafico_wellness_pre_lesion(df_pre: pd.DataFrame):
             yanchor="bottom",
             y=1.02,
             xanchor="left",
-            x=0
+            x=0,
         ),
         margin=dict(t=80),
-        hovermode="x unified"
+        hovermode="x unified",
     )
 
     # ----------------------------
-    # Eje X: fechas claras
+    # Formato eje X
     # ----------------------------
     fig.update_xaxes(
         tickformat="%d-%m",
         dtick="D1",
-        tickangle=-45
+        tickangle=-45,
     )
 
-    #return fig
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig)
 
 ### RPE ------------------------------------------------
 
-def plot_carga_fatiga_recuperacion(df_states: pd.DataFrame, ventana_cronica: int = 42):
+def interpretar_estado_carga_individual(
+    df_plot: pd.DataFrame,
+    ventana_cronica: int = 42,
+    metodo: str = "ema",
+) -> str:
     """
-    Gráfico tipo Excel:
+    Genera una lectura automática del gráfico individual de carga,
+    fatiga aguda, fatiga crónica y estado de forma.
+    """
+
+    if df_plot is None or df_plot.empty:
+        return t("No hay datos suficientes para generar una interpretación automática.")
+
+    metodo = metodo.lower().strip()
+    if metodo not in {"sma", "ema"}:
+        metodo = "ema"
+
+    col_aguda = f"fatiga_aguda_7d_{metodo}"
+    col_cronica = f"fatiga_cronica_{ventana_cronica}d_{metodo}"
+    col_estado = f"estado_forma_{ventana_cronica}d_{metodo}"
+
+    required = {"fecha_sesion", "ua_diaria", col_aguda, col_cronica}
+    missing = required - set(df_plot.columns)
+
+    if missing:
+        return t("No hay columnas suficientes para interpretar el estado de carga individual.")
+
+    df = df_plot.copy()
+    df["fecha_sesion"] = pd.to_datetime(df["fecha_sesion"], errors="coerce")
+    df = df.dropna(subset=["fecha_sesion"]).sort_values("fecha_sesion")
+
+    if df.empty:
+        return t("No hay datos válidos para interpretar el estado de carga.")
+
+    last = df.iloc[-1]
+
+    ua_actual = last["ua_diaria"]
+    fatiga_aguda = last[col_aguda]
+    fatiga_cronica = last[col_cronica]
+    estado_forma = last[col_estado] if col_estado in df.columns else None
+
+    ratio = fatiga_aguda / fatiga_cronica if pd.notna(fatiga_cronica) and fatiga_cronica > 0 else None
+
+    # Interpretación principal
+    if ratio is None:
+        carga_txt = (
+            "No hay suficiente referencia crónica para valorar correctamente "
+            "la relación entre carga reciente y carga acumulada."
+        )
+    elif ratio > 1.5:
+        carga_txt = (
+            "La fatiga aguda está claramente por encima de la fatiga crónica. "
+            "Esto indica que la carga reciente supera con fuerza la referencia habitual de la jugadora."
+        )
+    elif ratio >= 1.3:
+        carga_txt = (
+            "La fatiga aguda se sitúa por encima de la referencia crónica. "
+            "La jugadora está entrando en una zona de carga elevada, por lo que conviene vigilar su respuesta."
+        )
+    elif ratio >= 0.8:
+        carga_txt = (
+            "La relación entre fatiga aguda y crónica se mantiene controlada. "
+            "La carga reciente parece alineada con la carga que la jugadora venía tolerando."
+        )
+    else:
+        carga_txt = (
+            "La fatiga aguda está por debajo de la referencia crónica. "
+            "Puede reflejar descarga, recuperación o menor exposición reciente al entrenamiento."
+        )
+
+    # Estado de forma
+    if estado_forma is None or pd.isna(estado_forma):
+        forma_txt = " El estado de forma no es interpretable con los datos actuales."
+    elif estado_forma < 0:
+        forma_txt = (
+            f" El estado de forma es negativo ({estado_forma:.1f}), lo que indica que "
+            f"la carga reciente está pesando más que la base acumulada."
+        )
+    elif estado_forma <= 5:
+        forma_txt = (
+            f" El estado de forma es prácticamente neutro ({estado_forma:.1f}), "
+            f"por lo que la jugadora parece estar en equilibrio."
+        )
+    else:
+        forma_txt = (
+            f" El estado de forma es positivo ({estado_forma:.1f}), lo que sugiere "
+            f"una buena adaptación a la carga reciente."
+        )
+
+    # Cambio reciente
+    cambio_txt = ""
+
+    if len(df) >= 6:
+        last3 = df["ua_diaria"].tail(3).mean()
+        prev3 = df["ua_diaria"].tail(6).head(3).mean()
+
+        if pd.notna(prev3) and prev3 > 50:
+            cambio = ((last3 / prev3) - 1) * 100
+
+            if cambio > 20:
+                cambio_txt = (
+                    f" Además, la carga media de los últimos 3 días ha aumentado "
+                    f"un {cambio:.1f}% respecto a los 3 días anteriores."
+                )
+            elif cambio < -20:
+                cambio_txt = (
+                    f" Además, la carga media de los últimos 3 días ha descendido "
+                    f"un {abs(cambio):.1f}% respecto a los 3 días anteriores."
+                )
+            else:
+                cambio_txt = " La carga reciente se mantiene relativamente estable respecto a los días anteriores."
+        else:
+            cambio_txt = (
+                " La comparación porcentual reciente debe interpretarse con cautela porque "
+                "la carga previa era baja o insuficiente."
+            )
+
+    return (
+        f"{carga_txt}"
+        f"{forma_txt}"
+        f"{cambio_txt}"
+        f" Última carga diaria registrada: {ua_actual:.0f} UA."
+    )
+
+def plot_carga_fatiga_recuperacion(
+    df_states: pd.DataFrame,
+    ventana_cronica: int = 42,
+    metodo: str = "ema",
+    fecha_lesion=None,
+    window_days: int = 7,
+):
+    """
+    Gráfico individual de estado de carga:
     - Barras: UA diaria
     - Líneas: Fatiga aguda y crónica
-    - Línea: Recuperación
+    - Línea: Estado de forma
+    - OPCIONAL: ventana centrada en lesión + línea vertical
     """
 
-    if df_states.empty:
-        return None
+    if df_states is None or df_states.empty:
+        st.info(t("No hay datos suficientes para mostrar el estado de carga."))
+        return
 
+    df_plot = df_states.copy()
+    df_plot["fecha_sesion"] = pd.to_datetime(df_plot["fecha_sesion"], errors="coerce")
+    df_plot = df_plot.dropna(subset=["fecha_sesion"]).sort_values("fecha_sesion")
+
+    # =====================================================
+    # Filtrado pre-lesión
+    # =====================================================
+    if fecha_lesion is not None:
+        fecha_lesion = pd.to_datetime(fecha_lesion)
+
+        start = fecha_lesion - pd.Timedelta(days=window_days)
+        end = fecha_lesion + pd.Timedelta(days=2)
+
+        df_plot = df_plot[
+            (df_plot["fecha_sesion"] >= start) &
+            (df_plot["fecha_sesion"] <= end)
+        ].copy()
+
+        if df_plot.empty:
+            st.info(t("No hay datos en la ventana de la lesión."))
+            return
+
+    # =====================================================
+    # Columnas dinámicas
+    # =====================================================
+    metodo = metodo.lower().strip()
+
+    if metodo not in {"sma", "ema"}:
+        metodo = "ema"
+
+    col_aguda = f"fatiga_aguda_7d_{metodo}"
+    col_cronica = f"fatiga_cronica_{ventana_cronica}d_{metodo}"
+    col_estado = f"estado_forma_{ventana_cronica}d_{metodo}"
+
+    required = {"fecha_sesion", "ua_diaria", col_aguda, col_cronica}
+    missing = required - set(df_plot.columns)
+
+    if missing:
+        st.info(t("Faltan columnas para graficar el estado de carga individual."))
+        st.write("Missing:", list(missing))
+        return
+
+    titulo_metodo = "SMA" if metodo == "sma" else "EMA"
+
+    titulo = (
+        f"Carga, Fatiga y Estado de forma ({titulo_metodo})"
+        if fecha_lesion is None
+        else f"Carga previa a lesión (-{window_days}d · {titulo_metodo})"
+    )
+
+    # =====================================================
+    # Título + caption explicativo
+    # =====================================================
+    st.markdown(t(f"#### {titulo}"))
+
+    st.caption(
+        t(
+            "Las barras grises muestran la carga diaria de la jugadora. "
+            "La línea roja representa la fatiga aguda reciente y la azul la fatiga crónica o carga de referencia. "
+            "La línea verde resume el estado de forma: valores positivos sugieren mejor adaptación y valores negativos indican que la carga reciente está pesando más que la base acumulada."
+        )
+    )
+
+    # =====================================================
+    # Gráfico
+    # =====================================================
     fig = go.Figure()
 
-    # --- UA diaria ---
     fig.add_bar(
-        x=df_states["fecha_sesion"],
-        y=df_states["ua_diaria"],
-        name="Carga diaria (UA)",
-        #opacity=0.6
+        x=df_plot["fecha_sesion"],
+        y=df_plot["ua_diaria"],
+        name=t("Carga diaria (UA)"),
         marker_color="rgba(150,150,150,0.4)",
     )
 
-    # --- Fatiga aguda ---
     fig.add_trace(
         go.Scatter(
-            x=df_states["fecha_sesion"],
-            y=df_states["fatiga_aguda_7d_ema"],
+            x=df_plot["fecha_sesion"],
+            y=df_plot[col_aguda],
             mode="lines",
-            name="Fatiga aguda (7d)",
+            name=t("Fatiga aguda (7d)"),
             line=dict(color="#E53935", width=2),
         )
     )
 
-    # --- Fatiga crónica ---
     fig.add_trace(
         go.Scatter(
-            x=df_states["fecha_sesion"],
-            y=df_states[f"fatiga_cronica_{ventana_cronica}d_ema"],
+            x=df_plot["fecha_sesion"],
+            y=df_plot[col_cronica],
             mode="lines",
-            name=f"Fatiga crónica ({ventana_cronica}d)",
+            name=t(f"Fatiga crónica ({ventana_cronica}d)"),
             line=dict(color="#1E88E5", width=2),
         )
     )
 
-    # --- Recuperación ---
-    fig.add_trace(
-        go.Scatter(
-            x=df_states["fecha_sesion"],
-            y=df_states[f"recuperacion_{ventana_cronica}d_ema"],
-            mode="lines",
-            name=f"Recuperación",
-            line=dict(color="#43A047", width=2, dash="dot"),
+    if col_estado in df_plot.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df_plot["fecha_sesion"],
+                y=df_plot[col_estado],
+                mode="lines",
+                name=t("Estado de forma"),
+                line=dict(color="#43A047", width=2, dash="dot"),
+            )
         )
+
+    # Marca de lesión
+    if fecha_lesion is not None:
+        fig.add_vline(
+            x=fecha_lesion,
+            line_width=2,
+            line_dash="dash",
+            line_color="red",
+        )
+
+        fig.add_annotation(
+            x=fecha_lesion,
+            y=df_plot["ua_diaria"].max(),
+            text=t("Lesión"),
+            showarrow=True,
+            arrowhead=2,
+            ax=0,
+            ay=-40,
+            font=dict(color="red")
+        )
+
+    fig.update_layout(
+        xaxis_title=t("Fecha"),
+        yaxis=dict(
+            title=t("Carga / Fatiga / Estado de forma (UA)"),
+            zeroline=True,
+            zerolinewidth=1,
+            zerolinecolor="gray",
+        ),
+        plot_bgcolor="white",
+        hovermode="x unified",
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        barmode="overlay",
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    # =====================================================
+    # Lectura automática
+    # =====================================================
+    conclusion = interpretar_estado_carga_individual(
+        df_plot,
+        ventana_cronica=ventana_cronica,
+        metodo=metodo
+    )
+
+    render_interpretacion_grafico(
+        "Lectura automática del periodo",
+        conclusion,
+        color="#43A047"
+    )
+
+
+### 
+
+def plot_wellness_evolucion_individual(df_daily: pd.DataFrame):
+    """
+    Evolución temporal del wellness de una jugadora.
+    Espera un DataFrame agregado por fecha_sesion.
+    """
+
+    if df_daily is None or df_daily.empty:
+        st.info(t("No hay datos de wellness para mostrar."))
+        return
+
+    df_plot = df_daily.copy()
+    df_plot["fecha_sesion"] = pd.to_datetime(df_plot["fecha_sesion"], errors="coerce")
+    df_plot = df_plot.dropna(subset=["fecha_sesion"]).sort_values("fecha_sesion")
+
+    cols_wellness = ["energia", "recuperacion", "sueno", "stress", "dolor"]
+    cols_wellness = [c for c in cols_wellness if c in df_plot.columns]
+
+    if "fecha_sesion" not in df_plot.columns or not cols_wellness:
+        st.warning(t("Faltan columnas necesarias para graficar el wellness individual."))
+        return
+
+    fig = go.Figure()
+
+    for col in cols_wellness:
+        fig.add_trace(
+            go.Scatter(
+                x=df_plot["fecha_sesion"],
+                y=df_plot[col],
+                mode="lines+markers",
+                name=col.capitalize()
+            )
+        )
+
+    # UA opcional en segundo eje
+    if "ua" in df_plot.columns:
+        fig.add_trace(
+            go.Bar(
+                x=df_plot["fecha_sesion"],
+                y=df_plot["ua"],
+                name="UA",
+                opacity=0.20,
+                yaxis="y2"
+            )
+        )
+
+    fig.update_layout(
+        title=t("Evolución temporal del wellness individual"),
+        xaxis_title=t("Fecha"),
+        yaxis=dict(
+            title=t("Wellness medio"),
+            range=[1, 5]
+        ),
+        yaxis2=dict(
+            title=t("UA"),
+            overlaying="y",
+            side="right",
+            showgrid=False
+        ),
+        plot_bgcolor="white",
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        barmode="overlay",
+        hovermode="x unified",
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def plot_carga_semanal_individual(df: pd.DataFrame) -> pd.DataFrame:
+    """Evolución semanal de la carga total y media de una jugadora."""
+    if df is None or df.empty or "fecha_sesion" not in df.columns or "ua" not in df.columns:
+        st.info(t("No hay datos de carga disponibles."))
+        return pd.DataFrame()
+
+    out = df.copy()
+    out["fecha_sesion"] = pd.to_datetime(out["fecha_sesion"], errors="coerce")
+
+    out["anio"] = out["fecha_sesion"].dt.year
+    out["semana"] = out["fecha_sesion"].dt.isocalendar().week
+
+    out["inicio_semana"] = out["fecha_sesion"] - pd.to_timedelta(out["fecha_sesion"].dt.weekday, unit="d")
+    out["fin_semana"] = out["inicio_semana"] + pd.Timedelta(days=6)
+    out["rango_semana"] = out["inicio_semana"].dt.strftime("%d %b") + "–" + out["fin_semana"].dt.strftime("%d %b")
+
+    weekly = (
+        out.groupby(["anio", "semana", "rango_semana"], as_index=False)
+        .agg(
+            carga_total=("ua", "sum"),
+            carga_media=("ua", "mean"),
+            rpe_prom=("rpe", "mean"),
+            fecha_min=("fecha_sesion", "min"),
+            fecha_max=("fecha_sesion", "max"),
+        )
+        .sort_values(["anio", "semana"])
+    )
+
+    fig = px.line(
+        weekly,
+        x="rango_semana",
+        y="carga_total",
+        markers=True,
+        title=t("Carga total semanal (UA)"),
     )
 
     fig.update_layout(
-        title=f"Carga, Fatiga y Recuperación",
-        xaxis_title="Fecha",
-        yaxis_title="UA / día",
+        xaxis_title=t("Semana"),
+        yaxis_title=t("Carga (UA)"),
         plot_bgcolor="white",
-        hovermode="x unified",
-        #legend_title_text="Métricas",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
 
-    st.plotly_chart(fig)
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.dataframe(
+        weekly[["rango_semana", "carga_total", "carga_media", "rpe_prom"]].rename(
+            columns={
+                "rango_semana": "Semana",
+                "carga_total": "Carga total (UA)",
+                "carga_media": "Carga media (UA)",
+                "rpe_prom": "RPE promedio",
+            }
+        ),
+        hide_index=True,
+        use_container_width=True,
+    )
+
+    return weekly
+
+
+def plot_carga_diaria_detalle_individual(df: pd.DataFrame, start=None, end=None):
+    """Detalle diario de carga individual, incluyendo días sin carga."""
+
+    if df is None or df.empty or "ua" not in df.columns or "fecha_sesion" not in df.columns:
+        st.info(t("No hay datos de carga disponibles."))
+        return
+
+    out = df.copy()
+    out["fecha_sesion"] = pd.to_datetime(out["fecha_sesion"], errors="coerce").dt.normalize()
+
+    daily_real = (
+        out.groupby("fecha_sesion", as_index=False)
+        .agg(
+            carga_total=("ua", "sum"),
+            carga_media=("ua", "mean"),
+            rpe_prom=("rpe", "mean"),
+        )
+        .sort_values("fecha_sesion")
+    )
+
+    if start is not None and end is not None:
+        fecha_min = pd.to_datetime(start).normalize()
+        fecha_max = pd.to_datetime(end).normalize()
+    else:
+        fecha_min = daily_real["fecha_sesion"].min()
+        fecha_max = daily_real["fecha_sesion"].max()
+
+    calendario = pd.DataFrame({
+        "fecha_sesion": pd.date_range(start=fecha_min, end=fecha_max, freq="D")
+    })
+
+    daily = calendario.merge(daily_real, on="fecha_sesion", how="left")
+
+    daily["carga_total"] = daily["carga_total"].fillna(0)
+    daily["carga_media"] = daily["carga_media"].fillna(0)
+    daily["rpe_prom"] = daily["rpe_prom"].fillna(0)
+
+    daily["fecha_label"] = daily["fecha_sesion"].dt.strftime("%d %b")
+
+    fig = px.bar(
+        daily,
+        x="fecha_label",
+        y="carga_total",
+        text="carga_total",
+        title=t("Detalle diario de carga (UA)"),
+    )
+
+    fig.update_traces(
+        texttemplate="%{text:.0f}",
+        textposition="outside",
+        cliponaxis=False,
+    )
+
+    fig.update_layout(
+        xaxis_title=t("Fecha"),
+        yaxis_title=t("Carga (UA)"),
+        plot_bgcolor="white",
+        xaxis=dict(type="category", categoryorder="array", categoryarray=daily["fecha_label"].tolist()),
+        showlegend=False,
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    daily_show = daily.copy()
+    daily_show["fecha_sesion"] = daily_show["fecha_sesion"].dt.date
+
+    st.dataframe(
+        daily_show[["fecha_sesion", "carga_total", "carga_media", "rpe_prom"]].rename(
+            columns={
+                "fecha_sesion": "Fecha",
+                "carga_total": "Carga total (UA)",
+                "carga_media": "Carga media (UA)",
+                "rpe_prom": "RPE promedio",
+            }
+        ),
+        hide_index=True,
+        use_container_width=True,
+    )
+
+
+def plot_carga_vs_wellness(df: pd.DataFrame):
+    """
+    Scatter: carga vs wellness.
+    """
+
+    if df is None or df.empty:
+        st.info("No hay datos suficientes.")
+        return
+
+    df_plot = df.copy()
+
+    # wellness promedio
+    cols = ["recuperacion", "energia", "sueno", "stress", "dolor"]
+    df_plot["wellness"] = df_plot[cols].mean(axis=1)
+
+    fig = px.scatter(
+        df_plot,
+        x="ua",
+        y="wellness",
+        color="rpe",
+        title="Carga vs Wellness",
+        labels={
+            "ua": "Carga (UA)",
+            "wellness": "Wellness",
+            "rpe": "RPE"
+        }
+    )
+
+    st.plotly_chart(fig, use_container_width=True)

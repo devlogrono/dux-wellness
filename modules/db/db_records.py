@@ -5,16 +5,32 @@ import datetime
 
 from modules.db.db_catalogs import load_catalog_list_db
 from modules.db.db_client import query, execute
+from modules.db.db_utils import build_user_access_filter
 
 def get_records_db(as_df: bool = True):
     """
-    Carga registros de wellness, con joins ya incluidos.
+    Carga registros de wellness con joins incluidos.
     """
 
     zonas_anatomicas_df = load_catalog_list_db("zonas_anatomicas", as_df=True)
-    map_zonas = dict(zip(zonas_anatomicas_df["id"], zonas_anatomicas_df["nombre"]))
 
-    sql = """
+    if (
+        zonas_anatomicas_df is None
+        or zonas_anatomicas_df.empty
+        or "id" not in zonas_anatomicas_df.columns
+        or "nombre" not in zonas_anatomicas_df.columns
+    ):
+        map_zonas = {}
+    else:
+        map_zonas = dict(
+            zip(
+                zonas_anatomicas_df["id"],
+                zonas_anatomicas_df["nombre"]
+            )
+        )
+
+
+    sql = f"""
         SELECT 
             w.id,
             w.id_jugadora,
@@ -43,24 +59,32 @@ def get_records_db(as_df: bool = True):
             w.observacion,
             w.fecha_hora_registro,
             w.usuario
+
         FROM wellness AS w
         LEFT JOIN futbolistas f ON w.id_jugadora = f.identificacion
         LEFT JOIN tipo_carga ec ON w.id_tipo_carga = ec.id
         LEFT JOIN estimulos_readaptacion er ON w.id_tipo_readaptacion = er.id
         LEFT JOIN tipo_condicion tc ON w.id_condicion = tc.id
         LEFT JOIN zonas_segmento zs ON w.id_zona_segmento_dolor = zs.id
-        WHERE f.genero = 'F' AND f.id_estado = 1
-        AND w.estatus_id <= 2
-        ORDER BY w.fecha_hora_registro DESC;
+
+        WHERE f.genero = 'F'
+          AND f.id_estado = 1
+          AND w.estatus_id <= 2
+          AND {user_filter}
+
+        ORDER BY w.fecha_hora_registro DESC
     """
 
-    rows = query(sql)
+    rows = query(sql, user_params)
+
     if not rows:
         return pd.DataFrame() if as_df else []
 
     df = pd.DataFrame(rows)
 
-    # Procesar JSON
+    # ----------------------------
+    # Procesar JSON zonas dolor
+    # ----------------------------
     df["zonas_anatomicas_dolor"] = df["zonas_anatomicas_dolor"].apply(
         lambda x: json.loads(x) if isinstance(x, str) and x.strip().startswith("[") else []
     )
@@ -69,24 +93,20 @@ def get_records_db(as_df: bool = True):
         lambda ids: [map_zonas.get(i, f"ID {i}") for i in ids]
     )
 
-    # Convertir fechas
+    # ----------------------------
+    # Normalizar fechas
+    # ----------------------------
     df["fecha_sesion"] = pd.to_datetime(df["fecha_sesion"], errors="coerce").dt.date
     df["fecha_hora_registro"] = pd.to_datetime(df["fecha_hora_registro"], errors="coerce")
 
-    # Filtrar por rol
-    rol = st.session_state["auth"]["rol"].lower()
-    if rol == "developer":
-        df = df[df["usuario"] == "developer"]
-    else:
-        df = df[df["usuario"] != "developer"]
-
+    # ----------------------------
     # Columna nombre_jugadora
+    # ----------------------------
     df.insert(2, "nombre_jugadora", (df["nombre"] + " " + df["apellido"]).str.strip().str.upper())
 
     df = df.drop(columns=["nombre", "apellido"], errors="ignore")
-    
-    return df if as_df else df.to_dict("records")
-      
+
+    return df if as_df else df.to_dict("records")  
 def upsert_record_db(record: dict, modo: str = "checkin") -> bool:
 
     usuario_actual = st.session_state["auth"]["name"].lower()
@@ -189,27 +209,28 @@ def search_existing_record(record):
     if isinstance(fecha_sesion, str):
         fecha_sesion = datetime.date.fromisoformat(fecha_sesion)
 
-    rol = st.session_state["auth"]["rol"].lower()
-    usuario_condition = (
-        "usuario = 'developer'"
-        if rol == "developer"
-        else "usuario != 'developer'"
-    )
+    # ----------------------------
+    # Control de acceso
+    # ----------------------------
+    user_filter, user_params = build_user_access_filter()
+
 
     sql = f"""
-        SELECT id FROM wellness
+        SELECT id
+        FROM wellness
         WHERE id_jugadora = %s
           AND fecha_sesion = %s
           AND turno = %s
           AND estatus_id <= 2
-          AND {usuario_condition}
+          AND {user_filter}
         LIMIT 1;
     """
 
     params = (
         record["id_jugadora"],
         fecha_sesion,
-        record["turno"]
+        record["turno"],
+        *user_params
     )
 
     rows = query(sql, params)

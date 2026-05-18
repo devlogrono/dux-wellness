@@ -15,7 +15,8 @@ from modules.ui.ui_app import (
     generar_resumen_periodo,
     show_interpretation,
     mostrar_resumen_tecnico,
-    get_pendientes_check
+    get_pendientes_check,
+    calc_delta
 )
 
 from modules.i18n.i18n import t
@@ -72,7 +73,10 @@ with col1:
 #st.dataframe(df_periodo, hide_index=True)
 
 # Cálculos principales
-wellness_prom, chart_wellness, delta_wellness = calc_metric_block(df_periodo, periodo, "wellness_score", "mean")
+wellness_prom_raw, chart_wellness_raw, delta_wellness_raw = calc_metric_block(df_periodo, periodo, "wellness_score", "mean")
+wellness_prom = 30 - wellness_prom_raw
+chart_wellness = [30 - v for v in chart_wellness_raw]
+delta_wellness = calc_delta(chart_wellness)
 rpe_prom, chart_rpe, delta_rpe = calc_metric_block(df_periodo, periodo, "rpe", "mean")
 ua_total, chart_ua, delta_ua = calc_metric_block(df_periodo, periodo, "ua", "sum")
 alertas_count, total_jugadoras, alertas_pct, chart_alertas, delta_alertas = calc_alertas(df_periodo, df, periodo)
@@ -80,6 +84,7 @@ alertas_count, total_jugadoras, alertas_pct, chart_alertas, delta_alertas = calc
 # ============================================================
 # 💠 TARJETAS DE MÉTRICAS
 # ============================================================
+
 render_metric_cards(wellness_prom, delta_wellness, chart_wellness, rpe_prom, delta_rpe, chart_rpe, ua_total, delta_ua, chart_ua, alertas_count, total_jugadoras, alertas_pct, chart_alertas, delta_alertas, articulo)
 
 # ============================================================
