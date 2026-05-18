@@ -192,7 +192,6 @@ def filtrar_registros(
     # -------------------------
     # MODO: reporte (rango de fechas)
     # -------------------------
-    
     elif (modo == "reporte" or modo == "reporte_grupal") and start and end:
 
         # Normalizar tipos de fecha
@@ -209,7 +208,6 @@ def filtrar_registros(
             (df_filtrado["fecha_sesion"] >= start)
             & (df_filtrado["fecha_sesion"] <= end)
         ]
-        
 
     # ===========================================================
     # MODO: AUSENCIAS (usa fecha_inicio y fecha_fin)

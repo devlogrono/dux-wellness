@@ -9,7 +9,7 @@ def init_connection():
 
     pool = pooling.MySQLConnectionPool(
         pool_name="main_pool",
-        pool_size=3,
+        pool_size=15,
         pool_reset_session=True,
         host=db_config["host"],
         user=db_config["username"],
